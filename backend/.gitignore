@@ -1,0 +1,48 @@
+# Composer
+/vendor/
+composer.phar
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Keep template env file
+!.env.example
+
+# Logs
+*.log
+logs/
+storage/logs/
+
+# Cache
+cache/
+tmp/
+temp/
+
+.phpunit.result.cache
+
+# Test Coverage
+coverage/
+.clover.xml
+
+# IDEs & Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Runtime Files
+*.pid
+
+# Database (if local)
+*.sqlite
+*.sqlite3
+
+# Backup Files
+*.bak
+*.old
