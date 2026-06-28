@@ -168,6 +168,7 @@ try {
     // If the code changed, cascade the new prefix to all children
     if ($parentChanged && $newCode !== $group['code']) {
         cascadeCodeUpdate($pdo, $id, $group['code'], $newCode, $newType);
+        cascadeAccountCodeUpdate($pdo, $id, $newCode);
     }
 
     $pdo->commit();
