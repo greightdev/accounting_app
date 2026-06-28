@@ -45,7 +45,54 @@ function cascadeCodeUpdate(PDO $pdo, int $groupId, string $oldPrefix, string $ne
         $newChildCode = $newPrefix . substr($child['code'], strlen($oldPrefix));
         $updateStmt->execute([$newChildCode, $inheritedType, $child['id']]);
  
+        cascadeAccountCodeUpdate($pdo, $child['id'], $newChildCode);
+
         // Recurse into this child's subtree
         cascadeCodeUpdate($pdo, $child['id'], $child['code'], $newChildCode, $inheritedType);
     }
+}
+
+function cascadeAccountCodeUpdate(PDO $pdo, int $groupId, string $newGroupCode): void
+{
+    // Renumber all accounts under this group
+    $accounts = $pdo->prepare("
+        SELECT id FROM accounts
+        WHERE account_group_id = ? AND is_active = TRUE
+        ORDER BY code ASC
+    ");
+    $accounts->execute([$groupId]);
+    $accountList = $accounts->fetchAll();
+
+    $updateAccount = $pdo->prepare("
+        UPDATE accounts
+        SET code = ?
+        WHERE id = ?
+    ");
+
+    foreach ($accountList as $index => $account) {
+        $newCode = $newGroupCode . '.' . str_pad($index + 1, 5, '0', STR_PAD_LEFT);
+        $updateAccount->execute([$newCode, $account['id']]);
+    }
+}
+
+function generateAccountCode(PDO $pdo, int $groupId, string $groupCode, int $excludeId = 0): string {
+    $stmt = $pdo->prepare("
+        SELECT code
+        FROM accounts
+        WHERE account_group_id = ?
+            AND is_active = TRUE
+            AND id != ?
+        ORDER BY code DESC
+        LIMIT 1
+    ");
+    $stmt->execute([$groupId, $excludeId]);
+    $last = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($last && preg_match('/\.(\d+)$/', $last['code'], $m)) {
+        $next = (int)$m[1] + 1;
+    } else {
+        $next = 1;
+    }
+
+    return $groupCode . '.' . str_pad($next, 5, '0', STR_PAD_LEFT);
 }
