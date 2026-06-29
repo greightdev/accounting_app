@@ -1,11 +1,29 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import api from "../api/axios";
 
 // Placeholder user — replace with real auth state later
 const currentUser = { name: 'Admin', role: 'admin' };
 
-export default function Topbar({ title = 'Overview' }) {
+const PAGE_TITLES = {
+  '/dashboard': 'Dashboard',
+  '/contacts': 'Contacts',
+  '/services': 'Services',
+  '/transactions': 'Transactions',
+  '/sales/invoices': 'Invoices',
+  '/sales/receipts': 'Receipts',
+  '/purchase': 'Purchase',
+  '/banking': 'Banking',
+  '/journal': 'Journal',
+  '/chartofaccounts': 'Chart of Accounts',
+  '/reports': 'Reports',
+  '/settings': 'Settings',
+}
+
+export default function Topbar() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const title = PAGE_TITLES[location.pathname] ?? 'Overview';
 
   const handleLogout = async () => {
     try {
@@ -20,7 +38,7 @@ export default function Topbar({ title = 'Overview' }) {
 
   return (
     <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-7 flex-shrink-0">
-      <span className="text-[15px] font-semibold text-gray-900">{title}</span>
+      <span className="text-xl font-bold text-gray-900">{title}</span>
 
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2.5">
