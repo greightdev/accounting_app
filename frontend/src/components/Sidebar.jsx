@@ -14,9 +14,9 @@ const navItems = [
       ],
     },
     { 
-      label: 'Purchase',
+      label: 'Purchases',
       children: [
-        { label: 'Expenses', path: '/purchase/expenses' },
+        { label: 'Expenses', path: '/purchases/expenses' },
       ],
     },
     { 
@@ -28,7 +28,7 @@ const navItems = [
     },
     { label: 'Journal', path: '/journal' },
     { label: 'Chart of Accounts', path: '/chartofaccounts' },
-    { label: 'A/c Reports', path: '/reports' },
+    { label: 'Account Reports', path: '/reports' },
     { label: 'Settings', path: '/settings' },
 ];
 
