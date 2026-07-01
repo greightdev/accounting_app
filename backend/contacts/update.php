@@ -7,7 +7,7 @@ require_once '../includes/auth.php';
 requireRole(['admin', 'accountant']);
 
 // Only accept POST
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+if ($_SERVER['REQUEST_METHOD'] !== 'PUT') {
     http_response_code(405);
     echo json_encode([
         "success" => false,
@@ -74,7 +74,7 @@ try {
     }
 
     // Duplicate check
-    if ($email != $contacts['email']) {
+    if ($email !== $contacts['email']) {
         $dupCheck = $pdo->prepare("
             SELECT id
             FROM contacts
