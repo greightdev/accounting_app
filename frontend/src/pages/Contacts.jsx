@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, SquarePen, Trash2 } from "lucide-react";
 import api from "../api/axios"; 
+import Toolbar from "../components/Toolbar";
 
 const emptyForm = {
     name: '',
@@ -17,6 +18,7 @@ export default function Contacts() {
     const [contacts, setContacts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('All');
+    const [search, setSearch] = useState('');
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingContact, setEditingContact] = useState(null);
@@ -71,7 +73,7 @@ export default function Contacts() {
     };
 
 
-    const handleChange = () => {
+    const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
         setForm((prev) => ({
             ...prev,
@@ -127,51 +129,24 @@ export default function Contacts() {
         }
     };
 
+    const filteredContacts = contacts.filter((contact) => {
+        const term = search.toLowerCase();
+
+        return (
+            contact.name.toLowerCase().includes(term) ||
+            (contact.email ?? "").toLowerCase().includes(term) ||
+            (contact.phone ?? "").toLowerCase().includes(term) ||
+            (contact.type ?? "").toLowerCase().includes(term)
+        );
+    });
+
     return (
         <>                
-            <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-6">
-                    {/* Search box */}
-                    <div className="relative w-64">
-                        <Search
-                            size={18}
-                            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                        />
-
-                        <input
-                            type="text"
-                            placeholder="Search contacts..."
-                            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
-                        />
-                    </div>
-
-                    {/* Filter */}
-                    <div className="flex gap-2">
-                        {['All', 'Customer', 'Vendor', 'Employee'].map((tab) => (
-                            <button
-                                key={tab}
-                                onClick={() => setFilter(tab)}
-                                className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition ${
-                                filter === tab
-                                    ? 'bg-slate-700 text-white'
-                                    : 'bg-white text-slate-600 border-b border-slate-100 hover:bg-slate-100 tramsition-colors'
-                                }`}
-                            >
-                                {tab}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-
-                {/* New Contact */}
-                <button
-                    onClick={openCreateModal}
-                    className="px-5 py-2.5 rounded-lg bg-slate-700 text-white text-sm font-semibold shadow-sm hover:bg-slate-800 hover:shadow transition-all"
-                >
-                    + Add Contact
-                </button>
-            </div>
+            <Toolbar
+                search={{ value: search, onChange: setSearch }}
+                filters={{ options: ['All', 'Customer', 'Vendor', 'Employee'], active: filter, onChange: setFilter }}
+                actions={[{ label: '+ New Contact', onClick: openCreateModal }]}
+            />
 
             <table className="w-full overflow-hidden rounded-xl bg-white shadow-sm">
                 <thead>
@@ -185,7 +160,7 @@ export default function Contacts() {
                 </thead>
 
                 <tbody>
-                    {contacts.map((contact, index) => (
+                    {filteredContacts.map((contact, index) => (
                         <tr
                             key={contact.id}
                             className={`
@@ -321,49 +296,6 @@ export default function Contacts() {
                                 />
                                 <span className="text-sm text-gray-700">This contact deducts TDS on payments to us</span>
                             </label>
-
-                            {/* Opening balance — only settable on create, locked when editing
-                            {!editingContact && (
-                                <div className="pt-2 border-t border-gray-100">
-                                    <p className="text-xs font-medium text-gray-500 mb-3 mt-4">Opening Balance (optional)</p>
-                                    <div className="grid grid-cols-3 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Amount</label>
-                                            <input
-                                                name="opening_balance"
-                                                type="number"
-                                                min="0"
-                                                value={form.opening_balance}
-                                                onChange={handleChange}
-                                                placeholder="0.00"
-                                                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Type</label>
-                                            <select
-                                                name="opening_balance_type"
-                                                value={form.opening_balance_type}
-                                                onChange={handleChange}
-                                                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
-                                            >
-                                                <option value="DEBIT">Debit</option>
-                                                <option value="CREDIT">Credit</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Date</label>
-                                            <input
-                                                name="opening_date"
-                                                type="date"
-                                                value={form.opening_date}
-                                                onChange={handleChange}
-                                                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            )} */}
 
                             <div className="flex gap-3 pt-4">
                                 <button
