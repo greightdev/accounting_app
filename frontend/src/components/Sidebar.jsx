@@ -4,7 +4,7 @@ import { NavLink, useLocation } from "react-router-dom";
 const navItems = [
     { label: 'Dashboard', path: '/dashboard' },
     { label: 'Contacts', path: '/contacts' },
-    { label: 'Services', path: '/services' },
+    { label: 'Items', path: '/items' },
     { label: 'Transactions', path: '/transactions' },
     { 
       label: 'Sales',
@@ -23,7 +23,7 @@ const navItems = [
       label: 'Banking',
       children: [
         { label: 'Deposits', path: '/banking/deposits' },
-        { label: 'Withdrawal', path: '/banking/withdrawal' },
+        { label: 'Withdrawals', path: '/banking/withdrawals' },
       ],
     },
     { label: 'Journal', path: '/journal' },
