@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Search, SquarePen, Trash2 } from "lucide-react";
 import api from "../api/axios"; 
 import Toolbar from "../components/Toolbar";
