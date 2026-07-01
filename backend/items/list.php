@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 // Filter: ?tax_type=VAT13 / Exempt
 $taxType = $_GET['tax_type'] ?? null;
 $validTaxType = ['VAT13', 'Exempt'];
- 
+
 try {
     $sql = "
         SELECT

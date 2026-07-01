@@ -42,7 +42,7 @@ try {
             $map[$group['parent_id']]['children'][] = &$group;
         }
     }
-    
+
     http_response_code(200);
     echo json_encode([
         "success" => true,

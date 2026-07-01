@@ -16,10 +16,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     ]);
     exit();
 }
- 
+
 // Parse JSON body
 $data = json_decode(file_get_contents('php://input'), true);
- 
+
 if (!$data) {
     http_response_code(400);
     echo json_encode([
@@ -28,16 +28,16 @@ if (!$data) {
     ]);
     exit();
 }
- 
+
 $name = trim($data['name'] ?? '');
 $accountGroupId = $data['account_group_id'] ?? null;
 $openingBalance = $data['opening_balance'] ?? 0;
 $openingBalanceType = $data['opening_balance_type'] ?? null;
 $openingDate = $data['opening_date'] ?? null;
- 
+
 // Validation
 $errors = [];
- 
+
 if ($name === '') $errors[] = "Account name is required.";
 if (!$accountGroupId) $errors[] = "Account group is required.";
 if ($openingBalance > 0 && !in_array($openingBalanceType, ['DEBIT', 'CREDIT'], true)) {
@@ -46,7 +46,7 @@ if ($openingBalance > 0 && !in_array($openingBalanceType, ['DEBIT', 'CREDIT'], t
 if ($openingBalance > 0 && !$openingDate) {
     $errors[] = "Opening date is required when an opening balance is set.";
 }
- 
+
 if ($errors) {
     http_response_code(400);
     echo json_encode([
@@ -76,7 +76,7 @@ try {
     }
 
     $accountCode = generateAccountCode($pdo, $group['id'], $group['code']);
- 
+
     // Prevent duplicate account names
     $dupCheck = $pdo->prepare("
         SELECT id
@@ -92,7 +92,7 @@ try {
         ]);
         exit();
     }
- 
+
     $stmt = $pdo->prepare("
         INSERT INTO accounts (
             account_group_id,
@@ -115,7 +115,7 @@ try {
         $openingDate
     ]);
     $newId = $stmt->fetch()['id'];
- 
+
     // If an opening balance was given, post the offsetting entry to "Opening Balance" equity account
     if ($openingBalance > 0) {
         $obAccount = $pdo->query("
@@ -124,7 +124,7 @@ try {
             WHERE name = 'Opening Balance'
             LIMIT 1
         ")->fetch();
- 
+
         if ($obAccount) {
             // Insert a JOURNAL transaction representing the opening balance
             $txStmt = $pdo->prepare("
@@ -148,7 +148,7 @@ try {
                 $_SESSION['user_id'],
             ]);
             $txId = $txStmt->fetch()['id'];
- 
+
             $accountStmt = $pdo->prepare("
                 INSERT INTO account_entries (
                     transaction_id,
@@ -159,7 +159,7 @@ try {
                 )
                 VALUES (?, ?, ?, ?, ?, ?)
             ");
- 
+
             if ($openingBalanceType === 'DEBIT') {
                 $accountStmt->execute([$txId, $newId, $openingBalance, 0, $openingDate, "Opening balance"]);
                 $accountStmt->execute([$txId, $obAccount['id'], 0, $openingBalance, $openingDate, "Opening balance offset"]);
@@ -169,7 +169,7 @@ try {
             }
         }
     }
- 
+
     http_response_code(201);
     echo json_encode([
         "success" => true,

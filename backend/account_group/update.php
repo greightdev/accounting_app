@@ -16,10 +16,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'PUT') {
     ]);
     exit();
 }
- 
+
 // Parse JSON body
 $data = json_decode(file_get_contents('php://input'), true);
- 
+
 if (!$data) {
     http_response_code(400);
     echo json_encode([
@@ -48,7 +48,7 @@ if ($errors) {
     ]);
     exit();
 }
- 
+
 try {
     // Check group exists
     $existing = $pdo->prepare("
@@ -213,5 +213,3 @@ function getDecendantsIds(PDO $pdo, int $groupId): array {
 
     return $ids;
 }
-
-

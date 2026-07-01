@@ -15,10 +15,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     ]);
     exit();
 }
- 
+
 // Parse JSON body
 $data = json_decode(file_get_contents('php://input'), true);
- 
+
 if (!$data) {
     http_response_code(400);
     echo json_encode([
@@ -27,7 +27,7 @@ if (!$data) {
     ]);
     exit();
 }
- 
+
 $name = trim($data['name'] ?? '');
 $type = $data['type'] ?? '';
 $address = trim($data['address'] ?? '');
@@ -36,10 +36,10 @@ $phone = trim($data['phone'] ?? '');
 $pan = trim($data['pan'] ?? '');
 $tdsDeducted = ($data['tds_deducted'] ?? 'false') ? 'true' : 'false';
 $openingDate = $data['opening_date'] ?? null;
- 
+
 // Validation
 $errors = [];
- 
+
 if ($name === '') $errors[] = "Contact name is required.";
 if (!in_array($type, ['Customer', 'Vendor', 'Employee'], true)) $errors[] = "Type must be Customer, Vendor or Employee.";
 if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = "Enter a valid email.";
@@ -51,7 +51,7 @@ if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = "En
 // if ($openingBalance > 0 && !$openingDate) {
 //     $errors[] = "Opening date is required when an opening balance is set.";
 // }
- 
+
 if ($errors) {
     http_response_code(400);
     echo json_encode([
@@ -60,7 +60,7 @@ if ($errors) {
     ]);
     exit();
 }
- 
+
 try {
     // Duplicate check
     $dupCheck = $pdo->prepare("

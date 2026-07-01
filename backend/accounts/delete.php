@@ -15,10 +15,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'DELETE') {
     ]);
     exit();
 }
- 
+
 // Parse JSON body
 $data = json_decode(file_get_contents('php://input'), true);
- 
+
 if (!$data) {
     http_response_code(400);
     echo json_encode([
@@ -27,7 +27,7 @@ if (!$data) {
     ]);
     exit();
 }
- 
+
 $id = isset($data['id']) ? (int) $data['id'] : 0;
 
 if ($id <= 0) {
@@ -38,7 +38,7 @@ if ($id <= 0) {
     ]);
     exit();
 }
- 
+
 try {
     // Check account exists
     $existing = $pdo->prepare("

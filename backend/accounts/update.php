@@ -102,7 +102,7 @@ try {
         ]);
         exit();
     }
- 
+
     // Duplicate name check (excluding itself)
     if (strtolower($name) !== strtolower($account['name'])) {
         $dupCheck = $pdo->prepare("

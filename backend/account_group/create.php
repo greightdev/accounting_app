@@ -16,10 +16,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     ]);
     exit();
 }
- 
+
 // Parse JSON body
 $data = json_decode(file_get_contents('php://input'), true);
- 
+
 if (!$data) {
     http_response_code(400);
     echo json_encode([
@@ -28,16 +28,16 @@ if (!$data) {
     ]);
     exit();
 }
- 
+
 $name = trim($data['name'] ?? '');
 $parentId = $data['parent_id'] ?? null;
- 
+
 // Validation
 $errors = [];
- 
+
 if ($name === '') $errors[] = "Account group name is required.";
 if (!$parentId) $errors[] = "Parent group is required.";
- 
+
 if ($errors) {
     http_response_code(400);
     echo json_encode([
@@ -65,7 +65,7 @@ try {
         ]);
         exit();
     }
- 
+
     // Duplicate name check
     $dupName = $pdo->prepare("
         SELECT id
@@ -88,7 +88,7 @@ try {
 
     // Inherit type from parent
     $type = $parent['type'];
-    
+
     $stmt = $pdo->prepare("
         INSERT INTO account_groups (
             name,
@@ -106,7 +106,7 @@ try {
         $parentId,
     ]);
     $newId = $stmt->fetch()['id'];
- 
+
     http_response_code(201);
     echo json_encode([
         "success" => true,

@@ -15,10 +15,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     ]);
     exit();
 }
- 
+
 // Parse JSON body
 $data = json_decode(file_get_contents('php://input'), true);
- 
+
 if (!$data) {
     http_response_code(400);
     echo json_encode([
@@ -27,7 +27,7 @@ if (!$data) {
     ]);
     exit();
 }
- 
+
 $name = trim($data['name'] ?? '');
 $unit = trim($data['unit'] ?? '');
 $hsnSacCode = trim($data['hsn_sac_code'] ?? '');
@@ -36,10 +36,10 @@ $purchaseRate = $data['purchase_rate'] ?? 0;
 $taxType = $data['tax_type'] ?? 'VAT13';
 
 $validTaxTypes = ['VAT13', 'Exempt'];
- 
+
 // Validation
 $errors = [];
- 
+
 if ($name === '') $errors[] = "Item name is required.";
 if ($unit === '') $errors[] = "Item unit is required.";
 if ($hsnSacCode === '') $errors[] = "HSN/SAC code is required.";
@@ -55,7 +55,7 @@ if ($errors) {
     ]);
     exit();
 }
- 
+
 try {
     // Duplicate name check
     $dupCheck = $pdo->prepare("

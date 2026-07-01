@@ -11,7 +11,7 @@ function generateNextChildCode(PDO $pdo, int $parentId, string $parentCode): str
     ");
     $stmt->execute([$parentId]);
     $lastChild = $stmt->fetch();
- 
+
     if ($lastChild) {
         // Extract last 2 digits from teh highest child code and increment
         $suffix = (int) substr($lastChild['code'], strlen($parentCode));
@@ -20,7 +20,7 @@ function generateNextChildCode(PDO $pdo, int $parentId, string $parentCode): str
         // No children yet - start at 01
         $nextSuffix = 1;
     }
- 
+
     // Pad to 2 digits and append to parent code
     return $parentCode . str_pad($nextSuffix, 2, '0', STR_PAD_LEFT);
 }
@@ -44,7 +44,7 @@ function cascadeCodeUpdate(PDO $pdo, int $groupId, string $oldPrefix, string $ne
         // Swap the old prefix for the new one (rest of the suffix stays identical)
         $newChildCode = $newPrefix . substr($child['code'], strlen($oldPrefix));
         $updateStmt->execute([$newChildCode, $inheritedType, $child['id']]);
- 
+
         cascadeAccountCodeUpdate($pdo, $child['id'], $newChildCode);
 
         // Recurse into this child's subtree

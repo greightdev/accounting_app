@@ -18,7 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 
 // Filter: ?type=Customer / Vendor / Employee
 $typeFilter = $_GET['type'] ?? null;
- 
+
 try {
     $sql = "
         SELECT
