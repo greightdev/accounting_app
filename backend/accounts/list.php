@@ -33,7 +33,7 @@ try {
         FROM accounts a
         JOIN account_groups ag ON ag.id = a.account_group_id
         WHERE a.is_active = TRUE
-        ORDER BY ag.type, a.name
+        ORDER BY ag.type, a.code
     ");
     $accounts = $stmt->fetchAll();
 
