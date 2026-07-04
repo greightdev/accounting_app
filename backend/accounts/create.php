@@ -104,7 +104,6 @@ try {
             is_system
         )
         VALUES (?, ?, ?, ?, ?, ?, FALSE)
-        RETURNING id
     ");
     $stmt->execute([
         $accountGroupId,
@@ -114,7 +113,7 @@ try {
         $openingBalanceType,
         $openingDate
     ]);
-    $newId = $stmt->fetch()['id'];
+    $newId = (int) $pdo->lastInsertId();
 
     // If an opening balance was given, post the offsetting entry to "Opening Balance" equity account
     if ($openingBalance > 0) {
@@ -137,7 +136,6 @@ try {
                     created_by
                 )
                 VALUES ('JOURNAL', ?, ?, ?, ?, ?)
-                RETURNING id
             ");
             $refNumber = 'OB-' . $newId . '-' . time();
             $txStmt->execute([
@@ -147,7 +145,7 @@ try {
                 "Opening balance for account: $name",
                 $_SESSION['user_id'],
             ]);
-            $txId = $txStmt->fetch()['id'];
+            $txId = (int) $pdo->lastInsertId();
 
             $accountStmt = $pdo->prepare("
                 INSERT INTO account_entries (

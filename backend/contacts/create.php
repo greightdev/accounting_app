@@ -91,7 +91,6 @@ try {
         ) VALUES (
             ?, ?, ?, ?, ?, ?, ?, ?
         )
-        RETURNING id
     ");
 
     $stmt->execute([
@@ -104,7 +103,7 @@ try {
         $tdsDeducted,
         $openingDate
     ]);
-    $newId = $stmt->fetch()['id'];
+    $newId = (int) $pdo->lastInsertId();
 
     http_response_code(201);
     echo json_encode([

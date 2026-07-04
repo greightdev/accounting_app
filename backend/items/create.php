@@ -84,7 +84,6 @@ try {
         ) VALUES (
             ?, ?, ?, ?, ?, ?
         )
-        RETURNING id
     ");
 
     $stmt->execute([
@@ -95,7 +94,7 @@ try {
         (float)$purchaseRate,
         $taxType
     ]);
-    $newId = $stmt->fetch()['id'];
+    $newId = (int) $pdo->lastInsertId();
 
     http_response_code(201);
     echo json_encode([

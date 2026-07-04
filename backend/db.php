@@ -7,13 +7,12 @@ $dotenv->load();
 
 // Database config
 $host = $_ENV['DB_HOST'] ?? 'localhost';
-$port = $_ENV['DB_PORT'] ?? '5432';
 $user = $_ENV['DB_USER'] ?? '';
 $db = $_ENV['DB_NAME'] ?? '';
 $pass = $_ENV['DB_PASSWORD'] ?? '';
 
 try {
-    $dsn = "pgsql:host=$host;port=$port;dbname=$db";
+    $dsn = "mysql:host=$host;dbname=$db;charset=utf8mb4";
     $pdo = new PDO(
         $dsn,
         $user,
