@@ -16,7 +16,8 @@ const navItems = [
     { 
       label: 'Purchases',
       children: [
-        { label: 'Expenses', path: '/purchases/expenses' },
+        { label: 'Bills', path: '/purchases/bills' },
+        { label: 'Payments', path: '/purchases/payments' },
       ],
     },
     { 

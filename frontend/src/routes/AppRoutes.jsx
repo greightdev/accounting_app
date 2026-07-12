@@ -8,7 +8,8 @@ import Items from "../pages/Items";
 import Transactions from '../pages/Transactions';
 import Invoices from '../pages/sales/Invoices';
 import Receipts from '../pages/sales/Receipts';
-import Expenses from "../pages/purchases/Expenses";
+import Bills from "../pages/purchases/Bills";
+import Payments from "../pages/purchases/Payments";
 import Deposits from "../pages/banking/Deposits";
 import Withdrawals from "../pages/banking/Withdrawals";
 import Journal from "../pages/Journal";
@@ -29,7 +30,8 @@ export default function AppRoutes() {
           <Route path="/transactions" element={<Transactions />} />
           <Route path="/sales/invoices" element={<Invoices />} />
           <Route path="/sales/receipts" element={<Receipts />} />
-          <Route path="/purchases/expenses" element={<Expenses />} />
+          <Route path="/purchases/bills" element={<Bills />} />
+          <Route path="/purchases/payments" element={<Payments />} />
           <Route path="/banking/deposits" element={<Deposits />} />
           <Route path="/banking/withdrawals" element={<Withdrawals />} />
           <Route path="/journal" element={<Journal />} />
