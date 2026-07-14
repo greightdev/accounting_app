@@ -119,7 +119,7 @@ export default function Bills() {
         if (!window.confirm('Are you sure you want to delete this bill?')) return;
     
         try {
-            await api.delete('/purchases/transactions/void.php', { data: { id, void_reason: 'Voided by user.' } });
+            await api.delete('/transactions/void.php', { data: { id, void_reason: 'Voided by user.' } });
             showToast("Bill voided successfully.");
             fetchBills();
         } catch (err) {

@@ -120,7 +120,7 @@ export default function Invoices() {
         if (!window.confirm('Are you sure you want to delete this invoice?')) return;
     
         try {
-            await api.delete('/sales/transactions/void.php', { data: { id, void_reason: 'Voided by user.' } });
+            await api.delete('/transactions/void.php', { data: { id, void_reason: 'Voided by user.' } });
             showToast("Invoice voided successfully.");
             fetchInvoices();
         } catch (err) {
