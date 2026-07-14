@@ -1,40 +1,25 @@
 import { useRef, useState } from "react";
-import { X, Info, ChevronRight, ChevronDown, Plus, Trash2, User } from "lucide-react";
+import { X, ChevronRight, ChevronDown, Plus, Trash2 } from "lucide-react";
 
-const MODES = ["Cash", "Bank", "Credit"];
-const BANK_ACCOUNTS = ["Cash in Hand", "Petty Cash", "ABC Bank"];
- 
-const CONTACTS = [
-    { id: 1, name: "Injol", type: "Employee" },
-    { id: 2, name: "Binnayak Furniture", type: "Vendor" },
-    { id: 3, name: "Swastik", type: "Customer" },
-    { id: 4, name: "Precision", type: "Customer" },
-];
- 
-const ITEMS = [
-    { id: 1, name: "Digital Solutions", unit: "hrs", rate: 1850, taxType: "VAT13" },
-    { id: 2, name: "Web Development", unit: "hrs", rate: 1500, taxType: "VAT13" },
-    { id: 3, name: "Web Boosting", unit: "hrs", rate: 500, taxType: "Exempt" },
-];
- 
-const toLocalDate = (d) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
- 
+// TransactionForm — generic layout for any line-item document:
+// Sales Invoice, Purchase Bill, etc.
+
+const toLocalDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
 const emptyRow = (id) => ({
     id,
     itemId: "",
+    description: "",
     quantity: "",
     rate: "",
-    discount: "",
+    // discount: "",
     taxRate: "13",
 });
- 
+
 const labelCls = "block text-sm font-medium text-gray-700 mb-1.5";
-const inputCls =
-    "w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition";
-const cellInputCls =
-    "w-full px-2.5 py-2 rounded-md border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition";
- 
+const inputCls = "w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition";
+const cellInputCls = "w-full px-2.5 py-2 rounded-md border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition";
+
 function RequiredLabel({ children }) {
     return (
         <label className={labelCls}>
@@ -43,139 +28,176 @@ function RequiredLabel({ children }) {
         </label>
     );
 }
- 
-function CollapsibleRow({ label, defaultOpen = false, rightPlaceholder, children }) {
-    const [open, setOpen] = useState(defaultOpen);
-    return (
-        <div className="border border-gray-100 rounded-lg">
-            <button
-                type="button"
-                onClick={() => setOpen((o) => !o)}
-                className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition rounded-lg"
-            >
-                <span className="flex items-center gap-2">
-                    {open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-                    {label}
-                </span>
-                {!open && rightPlaceholder && (
-                    <span className="text-gray-400 text-sm font-normal">{rightPlaceholder}</span>
-                )}
-            </button>
-            {open && <div className="px-4 pb-4 pt-1">{children}</div>}
-        </div>
-    );
-}
- 
-export default function InvoiceForm({ draftNumber = "INV-8", onClose, onCreate }) {
+
+/**
+ * @param {string}   title                 e.g. "New Invoice", "New Bill"
+ * @param {string}   draftNumber           display value when billNumberEditable=false, or initial value for the editable input
+ * @param {boolean}  billNumberEditable    Sales Invoice: false (auto, sequential, PRD 3.1). Purchase Bill: true (optional, vendor's own number, PRD 4.1)
+ * @param {object}   initialData           existing transaction, for edit mode
+ * @param {boolean}  showDueDate           Sales Invoice: true (PRD 3.1). Purchase Bill: false (PRD 4.1)
+ * @param {boolean}  showPaymentAccount    false for Invoice/Bill — no cash/bank leg at this stage (PRD 3.1/4.1). true for Receipt/Payment.
+ * @param {string[]} modes                 e.g. ["Cash","Bank","Credit"]; pass ["Credit"] for Invoice/Bill since no Mode choice exists in the PRD at this stage
+ * @param {string[]} bankAccounts          options for the payment-account dropdown (only relevant when showPaymentAccount=true)
+ * @param {object[]} contacts              full contact list, e.g. [{id,name,type}]
+ * @param {string[]} contactTypes          Sales Invoice: ["Customer"]. Purchase Bill: ["Vendor"]
+ * @param {object[]} items                 catalog for the line-item Item dropdown, e.g. [{id,name,selling_price,purchase_rate,tax_type}]
+ * @param {string}   priceField            which item field to pull as the line rate: "selling_price" (Invoice) or "purchase_rate" (Bill)
+ * @param {string}   submitLabel           primary button text, default "Create"
+ * @param {string}   approveLabel          secondary button text, default "Create and Approve"
+ * @param {function} onClose
+ * @param {function} onCreate(payload)     called with the assembled payload; caller does the actual api.post(...)
+ */
+
+export default function TransactionForm({
+    title = "New Document",
+    draftNumber = "DRAFT-1",
+    billNumberEditable = false,
+    initialData = null,
+    showDueDate = true,
+    showPaymentAccount = false,
+    modes = ["Credit"],
+    bankAccounts = [],
+    showSalesman = false,
+    contacts = [],
+    contactTypes = [],
+    items = [],
+    priceField = "selling_price",
+    submitLabel = "Create",
+    approveLabel = "Create and Approve",
+    onClose,
+    onCreate,
+}) {
     const nextRowId = useRef(1);
- 
-    const [date, setDate] = useState(toLocalDate(new Date()));
+
+    const [date, setDate] = useState(initialData?.date ?? toLocalDate(new Date()));
     const [dueDate, setDueDate] = useState(() => {
+        if (initialData?.due_date) return initialData.due_date;
         const d = new Date();
         d.setDate(d.getDate() + 10);
         return toLocalDate(d);
     });
-    const [mode, setMode] = useState("Cash");
+    const [mode, setMode] = useState(modes[0] ?? "Credit");
     const [paymentAccount, setPaymentAccount] = useState("");
-    const [contact, setContact] = useState("");
+    const [contact, setContact] = useState(initialData?.contact_id != null ? String(initialData.contact_id) : "");
     const [salesman, setSalesman] = useState("");
-    const [note, setNote] = useState("");
+    const [notes, setNotes] = useState(initialData?.notes ?? "");
+    const [refNumber, setRefNumber] = useState(initialData?.ref_number ?? "");
     const [expandedRows, setExpandedRows] = useState({});
-    const [lineItems, setLineItems] = useState([emptyRow(nextRowId.current)]);
- 
+    const [lineItems, setLineItems] = useState(() => {
+        if (initialData?.line_items?.length) {
+            const rows = initialData.line_items.map((li, idx) => ({
+                id: idx + 1,
+                itemId: String(li.item_id),
+                description: li.description ?? "",
+                quantity: String(li.quantity),
+                rate: String(li.rate),
+                // discount: "",
+                taxRate: String(li.vat_rate ?? 13),
+            }));
+            nextRowId.current = rows.length;
+            return rows;
+        }
+        return [emptyRow(nextRowId.current)];
+    });
+
     const updateRow = (id, field, value) => {
         setLineItems((prev) =>
             prev.map((row) => {
                 if (row.id !== id) return row;
                 const next = { ...row, [field]: value };
                 if (field === "itemId") {
-                    const items = ITEMS.find((i) => String(i.id) === String(value));
-                    if (item) {
-                        next.rate = item.rate;
-                        next.taxRate = item.taxType === "VAT13" ? "13" : "0";
+                    const selected = items.find((i) => String(i.id) === String(value));
+                    if (selected) {
+                        next.rate = selected[priceField];
+                        next.taxRate = selected.tax_type === "VAT13" ? "13" : "0";
+                        if (!row.quantity) {
+                            next.quantity = "1";
+                        }
                     }
                 }
                 return next;
             })
         );
     };
- 
+
     const addRow = () => {
         nextRowId.current += 1;
         setLineItems((prev) => [...prev, emptyRow(nextRowId.current)]);
     };
- 
+
     const removeRow = (id) => {
         setLineItems((prev) => (prev.length > 1 ? prev.filter((r) => r.id !== id) : prev));
     };
- 
+
     const toggleRowDetail = (id) => {
         setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
     };
- 
+
     const computeRow = (row) => {
         const qty = parseFloat(row.quantity) || 0;
         const rate = parseFloat(row.rate) || 0;
-        const discount = parseFloat(row.discount) || 0;
+        // const discount = parseFloat(row.discount) || 0;
         const gross = qty * rate;
-        const taxable = Math.max(gross - discount, 0);
+        // const taxable = Math.max(gross - discount, 0);
+        const taxable = gross;
         const tax = taxable * ((parseFloat(row.taxRate) || 0) / 100);
-        return { gross, discount, taxable, tax };
+        return { gross, taxable, tax };
     };
- 
+
     const totals = lineItems.reduce(
         (acc, row) => {
             const c = computeRow(row);
             acc.subTotal += c.gross;
-            acc.discountTotal += c.discount;
+            // acc.discountTotal += c.discount;
             acc.taxableAmount += c.taxable;
             acc.taxTotal += c.tax;
             return acc;
         },
-        { subTotal: 0, discountTotal: 0, taxableAmount: 0, taxTotal: 0 }
+        { subTotal: 0, taxableAmount: 0, taxTotal: 0 }
     );
- 
+
     const totalBill = totals.taxableAmount + totals.taxTotal;
-    const discountPct = totals.subTotal > 0 ? (totals.discountTotal / totals.subTotal) * 100 : 0;
- 
+    // const discountPct = totals.subTotal > 0 ? (totals.discountTotal / totals.subTotal) * 100 : 0;
+
     const fmt = (n) =>
         n ? n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "-";
- 
-    const customers = CONTACTS.filter((c) => c.type === "Customer" || c.type === "Both");
-    const employees = CONTACTS.filter((c) => c.type === "Employee");
- 
+
+    const filteredContacts = contacts.filter((c) => contactTypes.includes(c.type));
+    const employees = contacts.filter((c) => c.type === "Employee");
+
     const handleSubmit = (approve) => {
         const payload = {
+            ...(initialData ? { id: initialData.id } : {}),
             date,
-            due_date: dueDate,
-            mode,
-            payment_account: paymentAccount,
+            ...(showDueDate ? { due_date: dueDate } : {}),
+            ...(showPaymentAccount ? { mode, payment_account: paymentAccount } : {}),
+            ...(billNumberEditable ? { ref_number: refNumber || null } : {}),
             contact_id: contact,
-            salesman_id: salesman,
-            note,
+            ...(showSalesman ? { salesman_id: salesman } : {}),
+            notes,
             line_items: lineItems.map((row) => {
                 const c = computeRow(row);
                 return {
                     item_id: row.itemId,
+                    description: row.description,
                     quantity: row.quantity,
                     rate: row.rate,
-                    discount: row.discount,
+                    // discount: row.discount,
                     tax_rate: row.taxRate,
                     amount: c.gross,
                 };
             }),
             sub_total: totals.subTotal,
-            discount_total: totals.discountTotal,
+            // discount_total: totals.discountTotal,
             taxable_amount: totals.taxableAmount,
             tax_total: totals.taxTotal,
             total_amount: totalBill,
-            status: approve ? "Approved" : "Draft",
+            status: approve ? "APPROVED" : "DRAFT",
         };
- 
-        // await api.post('/sales/invoices/create.php', payload);
+
         onCreate?.(payload);
     };
- 
+
     return (
         <div className="bg-white rounded-2xl shadow-sm">
             {/* Header */}
@@ -187,19 +209,33 @@ export default function InvoiceForm({ draftNumber = "INV-8", onClose, onCreate }
                     >
                         <X size={20} />
                     </button>
-                    <h2 className="text-lg font-semibold text-gray-900">New Invoice</h2>
+                    <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
                 </div>
-                
             </div>
- 
-            <div className={"px-7 py-6 space-y-6"}>
-                {/* Invoice # */}
+
+            <div className="px-7 py-6 space-y-6">
+                {/* Document # */}
                 <div className="flex items-center gap-1.5 text-sm text-gray-500">
-                    <span>Invoice #</span>
-                    <span className="font-semibold text-gray-700">DRAFT ({draftNumber})</span>
-                    <Info size={14} className="text-gray-400" />
+                    {billNumberEditable ? (
+                        <div className="w-full max-w-xs">
+                            <label className={labelCls}>Vendor Bill No.</label>
+                            <input
+                                type="text"
+                                placeholder="e.g. HSP-2026-001"
+                                value={refNumber}
+                                onChange={(e) => setRefNumber(e.target.value)}
+                                className={inputCls}
+                            />
+                        </div>
+                    ) : (
+                        <>
+                            <span className="font-semibold text-gray-700">
+                                {initialData ? draftNumber : `DRAFT (${draftNumber})`}
+                            </span>
+                        </>
+                    )}
                 </div>
- 
+
                 {/* Date / Due Date */}
                 <div className="grid grid-cols-3 gap-4">
                     <div>
@@ -211,55 +247,58 @@ export default function InvoiceForm({ draftNumber = "INV-8", onClose, onCreate }
                             className={inputCls}
                         />
                     </div>
-                    <div>
-                        <label className={labelCls}>Due Date</label>
-                        <input
-                            type="date"
-                            value={dueDate}
-                            onChange={(e) => setDueDate(e.target.value)}
-                            className={inputCls}
-                        />
-                    </div>
-                    
+                    {showDueDate && (
+                        <div>
+                            <label className={labelCls}>Due Date</label>
+                            <input
+                                type="date"
+                                value={dueDate}
+                                onChange={(e) => setDueDate(e.target.value)}
+                                className={inputCls}
+                            />
+                        </div>
+                    )}
                 </div>
- 
+
                 {/* Mode / Payment Account */}
-                <div className="grid grid-cols-3 gap-4">
-                    <div>
-                        <RequiredLabel>Mode</RequiredLabel>
-                        <select value={mode} onChange={(e) => setMode(e.target.value)} className={inputCls}>
-                            {MODES.map((m) => (
-                                <option key={m} value={m}>
-                                    {m}
-                                </option>
-                            ))}
-                        </select>
+                {showPaymentAccount && (
+                    <div className="grid grid-cols-3 gap-4">
+                        <div>
+                            <RequiredLabel>Mode</RequiredLabel>
+                            <select value={mode} onChange={(e) => setMode(e.target.value)} className={inputCls}>
+                                {modes.map((m) => (
+                                    <option key={m} value={m}>
+                                        {m}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className={labelCls}>Payment Account</label>
+                            <select
+                                value={paymentAccount}
+                                onChange={(e) => setPaymentAccount(e.target.value)}
+                                disabled={mode === "Credit"}
+                                className={`${inputCls} ${mode === "Credit" ? "opacity-50 cursor-not-allowed" : ""}`}
+                            >
+                                <option value="">Account</option>
+                                {bankAccounts.map((account) => (
+                                    <option key={account.id} value={account.id}>
+                                        {account.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
-                    <div>
-                        <label className={labelCls}>Payment Account</label>
-                        <select
-                            value={paymentAccount}
-                            onChange={(e) => setPaymentAccount(e.target.value)}
-                            disabled={mode === "Credit"}
-                            className={`${inputCls} ${mode === "Credit" ? "opacity-50 cursor-not-allowed" : ""}`}
-                        >
-                            <option value="">Account</option>
-                            {BANK_ACCOUNTS.map((a) => (
-                                <option key={a} value={a}>
-                                    {a}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
- 
+                )}
+
                 {/* Contact */}
                 <div className="grid grid-cols-3 gap-4">
                     <div>
                         <RequiredLabel>Contact</RequiredLabel>
                         <select value={contact} onChange={(e) => setContact(e.target.value)} className={inputCls}>
                             <option value="">Contact</option>
-                            {customers.map((c) => (
+                            {filteredContacts.map((c) => (
                                 <option key={c.id} value={c.id}>
                                     {c.name}
                                 </option>
@@ -267,14 +306,14 @@ export default function InvoiceForm({ draftNumber = "INV-8", onClose, onCreate }
                         </select>
                     </div>
                 </div>
- 
+
                 {/* Line items */}
                 <div className="pt-2">
                     <div className="flex items-center gap-3 mb-4">
                         <h3 className="text-xs font-bold tracking-wide text-gray-500 uppercase">Line Items</h3>
                         <div className="flex-1 border-t border-gray-100" />
                     </div>
- 
+
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead>
@@ -285,7 +324,7 @@ export default function InvoiceForm({ draftNumber = "INV-8", onClose, onCreate }
                                     <th className="text-left py-2 px-2 w-28">Quantity</th>
                                     <th className="text-left py-2 px-2 w-28">Rate</th>
                                     <th className="text-right py-2 px-2 w-28">Amount</th>
-                                    <th className="text-left py-2 px-2 w-32">Discount (Rs.)</th>
+                                    {/* <th className="text-left py-2 px-2 w-32">Discount (Rs.)</th> */}
                                     <th className="text-left py-2 px-2 w-32">Tax (%)</th>
                                     <th className="w-8" />
                                 </tr>
@@ -294,7 +333,7 @@ export default function InvoiceForm({ draftNumber = "INV-8", onClose, onCreate }
                                 {lineItems.map((row, idx) => {
                                     const c = computeRow(row);
                                     return (
-                                        <tr key={row.id} className="border-t border-gray-100 align-top">
+                                        <tr key={row.id} className="border-t border-gray-100 align-middle">
                                             <td className="py-2.5">
                                                 <button
                                                     type="button"
@@ -316,7 +355,7 @@ export default function InvoiceForm({ draftNumber = "INV-8", onClose, onCreate }
                                                     className={cellInputCls}
                                                 >
                                                     <option value="">Item</option>
-                                                    {ITEMS.map((i) => (
+                                                    {items.map((i) => (
                                                         <option key={i.id} value={i.id}>
                                                             {i.name}
                                                         </option>
@@ -326,6 +365,10 @@ export default function InvoiceForm({ draftNumber = "INV-8", onClose, onCreate }
                                                     <input
                                                         type="text"
                                                         placeholder="Description (optional)"
+                                                        value={row.description}
+                                                        onChange={(e) =>
+                                                            updateRow(row.id, "description", e.target.value)
+                                                        }
                                                         className={`${cellInputCls} mt-2`}
                                                     />
                                                 )}
@@ -357,7 +400,7 @@ export default function InvoiceForm({ draftNumber = "INV-8", onClose, onCreate }
                                                     <span className="text-gray-300">Amount</span>
                                                 )}
                                             </td>
-                                            <td className="py-2.5 px-2">
+                                            {/* <td className="py-2.5 px-2">
                                                 <input
                                                     type="number"
                                                     min="0"
@@ -366,7 +409,7 @@ export default function InvoiceForm({ draftNumber = "INV-8", onClose, onCreate }
                                                     onChange={(e) => updateRow(row.id, "discount", e.target.value)}
                                                     className={cellInputCls}
                                                 />
-                                            </td>
+                                            </td> */}
                                             <td className="py-2.5 px-2">
                                                 <select
                                                     value={row.taxRate}
@@ -392,7 +435,7 @@ export default function InvoiceForm({ draftNumber = "INV-8", onClose, onCreate }
                             </tbody>
                         </table>
                     </div>
- 
+
                     <button
                         type="button"
                         onClick={addRow}
@@ -401,29 +444,29 @@ export default function InvoiceForm({ draftNumber = "INV-8", onClose, onCreate }
                         <Plus size={15} /> Add Row
                     </button>
                 </div>
- 
+
                 {/* Notes + Totals */}
                 <div className="grid grid-cols-2 gap-10 pt-2">
                     <div>
-                        <label className={labelCls}>Internal Note/Remarks</label>
+                        <label className={labelCls}>Internal Notes/Remarks</label>
                         <textarea
-                            value={note}
-                            onChange={(e) => setNote(e.target.value)}
-                            placeholder="Internal Note/Remarks"
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            placeholder="Internal Notes/Remarks"
                             rows={5}
                             className={`${inputCls} resize-none`}
                         />
                     </div>
- 
+
                     <div className="space-y-2.5 text-sm pt-1">
                         <div className="flex items-center justify-between text-gray-600">
                             <span>SubTotal</span>
                             <span>{fmt(totals.subTotal)}</span>
                         </div>
-                        <div className="flex items-center justify-between text-gray-600">
+                        {/* <div className="flex items-center justify-between text-gray-600">
                             <span>Discount ({discountPct ? discountPct.toFixed(0) : 0}%)</span>
                             <span>{fmt(totals.discountTotal)}</span>
-                        </div>
+                        </div> */}
                         <div className="flex items-center justify-between text-gray-600 pt-2 border-t border-gray-100">
                             <span>Taxable amount</span>
                             <span>{fmt(totals.taxableAmount)}</span>
@@ -438,46 +481,29 @@ export default function InvoiceForm({ draftNumber = "INV-8", onClose, onCreate }
                         </div>
                     </div>
                 </div>
- 
+
                 {/* Salesman */}
-                <div className="flex items-center gap-3 pt-2">
-                    <span className="flex items-center gap-1.5 text-sm font-medium text-gray-700 w-32 shrink-0">
-                        <User size={15} className="text-gray-400" />
-                        Salesman
-                    </span>
-                    <select
-                        value={salesman}
-                        onChange={(e) => setSalesman(e.target.value)}
-                        className={`${inputCls} max-w-xs`}
-                    >
-                        <option value="">Contact</option>
-                        {employees.map((c) => (
-                            <option key={c.id} value={c.id}>
-                                {c.name}
-                            </option>
-                        ))}
-                    </select>
-                </div>
- 
-                {/* Collapsible sections */}
-                <div className="space-y-2">
-                    <CollapsibleRow label="Notes & Footer" rightPlaceholder="Load from saved Note...">
-                        <select className={inputCls}>
-                            <option value="">Load from saved Note...</option>
+                {/* {showSalesman && (
+                    <div className="flex items-center gap-3 pt-2">
+                        <span className="flex items-center gap-1.5 text-sm font-medium text-gray-700 w-32 shrink-0">
+                            <User size={15} className="text-gray-400" />
+                            Salesman
+                        </span>
+                        <select
+                            value={salesman}
+                            onChange={(e) => setSalesman(e.target.value)}
+                            className={`${inputCls} max-w-xs`}
+                        >
+                            <option value="">Contact</option>
+                            {employees.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                    {c.name}
+                                </option>
+                            ))}
                         </select>
-                    </CollapsibleRow>
- 
-                    <CollapsibleRow label="Attachments">
-                        <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-400">
-                            Drag files here, or click to upload
-                        </div>
-                    </CollapsibleRow>
- 
-                    <CollapsibleRow label="Reporting Tags" defaultOpen>
-                        <input type="text" placeholder="Add a tag and press enter" className={inputCls} />
-                    </CollapsibleRow>
-                </div>
- 
+                    </div>
+                )} */}
+
                 {/* Actions */}
                 <div className="flex gap-3 pt-4 border-t border-gray-100">
                     <button
@@ -485,18 +511,17 @@ export default function InvoiceForm({ draftNumber = "INV-8", onClose, onCreate }
                         onClick={() => handleSubmit(false)}
                         className="px-6 py-2.5 rounded-lg bg-slate-700 text-white text-sm font-semibold hover:bg-slate-800 transition"
                     >
-                        Create
+                        {submitLabel}
                     </button>
                     <button
                         type="button"
                         onClick={() => handleSubmit(true)}
                         className="px-6 py-2.5 rounded-lg bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition"
                     >
-                        Create and Approve
+                        {approveLabel}
                     </button>
                 </div>
             </div>
         </div>
     );
 }
- 
