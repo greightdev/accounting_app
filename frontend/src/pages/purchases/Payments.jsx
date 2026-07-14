@@ -19,11 +19,11 @@ const currentFiscalYear = () => {
 };
 
 
-export default function Receipts() {
-    const [receipts, setReceipts] = useState([]);
+export default function Payments() {
+    const [payments, setPayments] = useState([]);
     const [contacts, setContacts] = useState([]);
     const [bankAccounts, setBankAccounts] = useState([]);
-    const [openInvoices, setOpenInvoices] = useState([]);
+    const [openBills, setOpenBills] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [showForm, setShowForm] = useState(false);
@@ -31,17 +31,17 @@ export default function Receipts() {
     const { toast, showToast, hideToast } = useToast();
 
     useEffect(() => {
-        fetchReceipts();
+        fetchPayments();
         fetchFormData();
     }, []);
 
-    const fetchReceipts = async () => {
+    const fetchPayments = async () => {
         setLoading(true);
         try {
-            const { data } = await api.get(`/sales/receipts/list.php`);
-            setReceipts(data.data ?? []);
+            const { data } = await api.get(`/purchases/payments/list.php`);
+            setPayments(data.data ?? []);
         } catch (err) {
-            console.error('Failed to fetch receipts: ', err);
+            console.error('Failed to fetch payments: ', err);
         } finally {
             setLoading(false);
         }
@@ -62,80 +62,80 @@ export default function Receipts() {
         }
     };
 
-    const fetchOpenInvoicesForContact = async (contactId) => {
-        setOpenInvoices([]);
+    const fetchOpenBillsForContact = async (contactId) => {
+        setOpenBills([]);
         try {
             const { data } = await api.get(
-                `/sales/invoices/list.php?status=approved&contact_id=${contactId}`
+                `/purchases/bills/list.php?status=approved&contact_id=${contactId}`
             );
-            const invoices = data.data ?? [];
-            setOpenInvoices(invoices.filter((inv) => inv.payment_status !== "Fully Paid"));
+            const bills = data.data ?? [];
+            setOpenBills(bills.filter((inv) => inv.payment_status !== "Fully Paid"));
         } catch (err) {
-            console.error("Failed to fetch open invoices: ", err);
-            showToast("Failed to load this customer's open invoices.", "error");
+            console.error("Failed to fetch open bills: ", err);
+            showToast("Failed to load this vendor's open bills.", "error");
         }
     };
 
-    const filtered = receipts.filter((receipt) => {
+    const filtered = payments.filter((payment) => {
         const term = search.toLowerCase();
         const matchesSearch = 
-            (receipt.ref_number ?? "").toLowerCase().includes(term) ||
-            (receipt.customer_name ?? "").toLowerCase().includes(term);
-        const matchesVoidFilter = showVoided || receipt.status !== "VOID";
+            (payment.ref_number ?? "").toLowerCase().includes(term) ||
+            (payment.vendor_name ?? "").toLowerCase().includes(term);
+        const matchesVoidFilter = showVoided || payment.status !== "VOID";
         return matchesSearch && matchesVoidFilter;
     });
 
     const closeForm = () => {
         setShowForm(false);
-        setOpenInvoices([]);
+        setOpenBills([]);
     };
 
-    const handleCreateReceipt = async (payload) => {
+    const handleCreatePayment = async (payload) => {
         try {
-            await api.post("/sales/receipts/create.php", payload);
-            showToast("Receipt recorded successfully.");
+            await api.post("/purchases/payments/create.php", payload);
+            showToast("Payment recorded successfully.");
             closeForm();
-            fetchReceipts();
+            fetchPayments();
         } catch (err) {
-            showToast(err.response?.data?.message ?? "Failed to record receipt.", "error");
+            showToast(err.response?.data?.message ?? "Failed to record payment.", "error");
             throw err;
         }
     };
     
     const handleDelete = async (id) => {
-        if (!window.confirm('Are you sure you want to delete this receipt?')) return;
+        if (!window.confirm('Are you sure you want to delete this payment?')) return;
     
         try {
             await api.delete('/transactions/void.php', { data: { id } });
-            showToast("Receipt voided successfully.");
-            fetchReceipts();
+            showToast("Payment voided successfully.");
+            fetchPayments();
         } catch (err) {
-            showToast(err.response?.data?.message ?? 'Failed to void receipt.', "error");
+            showToast(err.response?.data?.message ?? 'Failed to void payment.', "error");
         }
     };
 
     const columns = [
         { key: "date", header: "Date", },
         { key: "ref_number", header: "#", },
-        { key: "customer_name", header: "Customer", },
+        { key: "vendor_name", header: "Vendor", },
         { key: "total_amount", header: "Total Cleared",
-            render: (receipt) => receipt.total_amount.toLocaleString(undefined, {
+            render: (payment) => payment.total_amount.toLocaleString(undefined, {
                 minimumFractionDigits: 2,
             }),
         },
         { key: "status", header: "Status",
-            render: (receipt) => (
-                <span className={`px-2.5 py-1 rounded-md text-xs font-medium ${statusStyles(receipt.status)}`}>
-                    {receipt.status}
+            render: (payment) => (
+                <span className={`px-2.5 py-1 rounded-md text-xs font-medium ${statusStyles(payment.status)}`}>
+                    {payment.status}
                 </span>
             ),
         },
         {
-            key: "actions", header: "Action", render: (receipt) => (
+            key: "actions", header: "Action", render: (payment) => (
                 <div className="flex items-center gap-2">
-                    {receipt.status !== "VOID" && (
+                    {payment.status !== "VOID" && (
                         <button
-                            onClick={() => handleDelete(receipt.id)}
+                            onClick={() => handleDelete(payment.id)}
                             className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
                         >
                             <Trash2 size={16} />
@@ -151,24 +151,24 @@ export default function Receipts() {
             <Toast toast={toast} onClose={hideToast} />
             {showForm ? (
                 <SettlementForm
-                    mode="receipt"
+                    mode="payment"
                     contacts={contacts}
                     bankAccounts={bankAccounts}
-                    openDocuments={openInvoices}
-                    onFetchDocuments={fetchOpenInvoicesForContact}
+                    openDocuments={openBills}
+                    onFetchDocuments={fetchOpenBillsForContact}
                     fiscalYear={currentFiscalYear()}
                     onClose={closeForm}
-                    onCreate={handleCreateReceipt}
+                    onCreate={handleCreatePayment}
                 />
             ) : (
                 <>
                     <Toolbar
                         search={{ value: search, onChange: setSearch }}
-                        actions={[{ label: '+ New Receipt', onClick: () => setShowForm(true) }]}
+                        actions={[{ label: '+ New Payment', onClick: () => setShowForm(true) }]}
                     />
 
                     <Tabs tabs={[]} toggle={{
-                        label: "Show voided receipts",
+                        label: "Show voided payments",
                         checked: showVoided,
                         onChange: () => setShowVoided((v) => !v),
                     }}/>
@@ -177,11 +177,11 @@ export default function Receipts() {
                     <div className="bg-white rounded-lg shadow">
                         {loading ? (
                             <div className="flex justify-center items-center py-20 text-slate-500">
-                                Loading receipts...
+                                Loading payments...
                             </div>
-                        ) : receipts.length === 0 ? (
+                        ) : payments.length === 0 ? (
                             <div className="flex justify-center items-center py-20 text-slate-500">
-                                No receipts found
+                                No payments found
                             </div>
                         ) : (
                             <DataTable
