@@ -1,0 +1,252 @@
+import { useEffect, useState } from "react";
+import { SquarePen, Trash2, Check, X } from "lucide-react";
+import Tabs from "../../components/Tabs";
+import Toolbar from "../../components/Toolbar";
+import api from "../../api/axios";
+import BankTransferForm from "../../components/BankTransferForm";
+import DataTable from "../../components/DataTable";
+import useToast from "../../hooks/useToast";
+import Toast from "../../components/Toast";
+
+export default function Withdrawals() {
+    const [transactions, setTransactions] = useState([]);
+    const [bankAccounts, setBankAccounts] = useState([]);
+    const [contraAccounts, setContraAccounts] = useState([]);
+    const [editingTx, setEditingTx] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [tab, setTab] = useState('approved');
+    const [search, setSearch] = useState('');
+    const [showForm, setShowForm] = useState(false);
+    const { toast, showToast, hideToast } = useToast();
+
+    useEffect(() => {
+        fetchTransactions();
+    }, [tab]);
+
+    useEffect(() => {
+        fetchBankAccounts();
+    }, []);
+
+    const fetchTransactions = async () => {
+        setLoading(true);
+        try {
+            const { data } = await api.get(`/banking/list.php?type=BANK_WITH&status=${tab}`);
+            setTransactions(data.data ?? []);
+        } catch (err) {
+            console.error('Failed to fetch withdrawals: ', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchBankAccounts = async () => {
+        try {
+            const { data } = await api.get("/bank_account/list.php?type=BANK");
+            setBankAccounts(data.data ?? []);
+        } catch (err) {
+            console.log(err)
+        }
+    };
+    
+    const fetchContraAccounts = async (excludeBankAccountId) => {
+        try {
+            const { data } = await api.get(`/banking/contra_accounts.php?type=cash_bank_or_expense${excludeBankAccountId ? `&exclude_bank_account_id=${excludeBankAccountId}` : ""}`);
+            setContraAccounts(data.data ?? []);
+        } catch (err) {
+            console.log(err)
+        }
+    };
+
+    const filtered = transactions.filter((tx) => {
+        const term = search.toLowerCase();
+        const matchesSearch = 
+            tx.ref_number.toLowerCase().includes(term) ||
+            (tx.bank_account_name ?? "").toLowerCase().includes(term) ||
+            (tx.contra_account_name ?? "").toLowerCase().includes(term);
+        return matchesSearch
+    });
+
+    const handleNew = () => {
+        setEditingTx(null);
+        fetchContraAccounts(null);
+        setShowForm(true);
+    }
+    
+    const handleEdit = async (tx) => {
+        try {
+            const { data } = await api.get(`/banking/get.php?id=${tx.id}`);
+            setEditingTx(data.data);
+            fetchContraAccounts(data.data.bank_account_id);
+            setShowForm(true);
+        } catch (err) {
+            showToast("Failed to load withdrawal details.", "error");
+        }
+    };
+
+    const closeForm = () => {
+        setShowForm(false);
+        setEditingTx(null);
+    };
+
+    const handleSubmit = async (payload) => {
+        try {
+            if (editingTx) {
+                await api.put("/banking/update.php", { id: editingTx.id, ...payload });
+                showToast("Withdrawal updated successfully.");
+            } else {
+                await api.post("/banking/create.php", { type: "BANK_WITH", ...payload});
+                showToast(
+                    payload.status === "APPROVED" ? "Withdrawal created and approved." : "Withdrawal saved as draft."
+                );
+            }
+            closeForm();
+            fetchTransactions();
+        } catch (err) {
+            console.error(err);
+            showToast(err.response?.data?.message ?? "Failed to save withdrawal.", "error");
+        }
+    };
+
+    const handleApprove = async (id) => {
+        if (!window.confirm('Approve this withdrawal? This will post it to the ledger and it can no longer be edited.')) return;
+
+        try {
+            await api.put('/banking/approve.php', { id });
+            showToast("Withdrawal approved successfully.");
+            fetchTransactions();
+        } catch (err) {
+            showToast(err.response?.data?.message ?? 'Failed to approve withdrawal.', "error");
+        }
+    };
+    
+    const handleDelete = async (id) => {
+        if (!window.confirm('Are you sure you want to delete this withdrawal?')) return;
+    
+        try {
+            await api.delete('/transactions/void.php', { data: { id, void_reason: 'Voided by user.' } });
+            showToast("Withdrawal voided successfully.");
+            fetchTransactions();
+        } catch (err) {
+            showToast(err.response?.data?.message ?? 'Failed to delete withdrawal.', "error");
+        }
+    };
+
+    const baseColumns = [
+        { key: "date", header: "Date", },
+        { key: "ref_number", header: "#", },
+        { key: "bank_account_name", header: "Withdrawn From", },
+        { key: "contra_account_name", header: "Destination", },
+        { key: "total_amount", header: "Amount",
+            render: (tx) => tx.total_amount.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+            }),
+        },
+    ];
+
+    const approvedActions = {
+        key: "actions",
+        header: "Action",
+        render: (tx) => (
+            <div className="flex items-center gap-2">
+                <button
+                    onClick={() => handleDelete(tx.id)}
+                    className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
+                >
+                    <Trash2 size={16} />
+                </button>
+            </div>
+        ),
+    };
+
+    const draftActions = {
+        key: "actions",
+        header: "Action",
+        render: (tx) => (
+            <button
+                onClick={() => handleEdit(tx)}
+                className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
+            >
+                <SquarePen size={16} />
+            </button>
+        ),
+    };
+
+    const approvalColumn = {
+        key: "approve",
+        header: "Approve / Reject",
+        render: (tx) => (
+            <div className="flex items-center gap-2">
+                <button
+                    onClick={() => handleApprove(tx.id)}
+                    className="p-2 rounded-md text-emerald-600 hover:bg-emerald-100 transition-colors"
+                    title="Approve"
+                >
+                    <Check size={16} />
+                </button>
+
+                <button
+                    onClick={() => handleDelete(tx.id)}
+                    className="p-2 rounded-md text-red-600 hover:bg-red-100 transition-colors"
+                    title="Reject"
+                >
+                    <X size={16} />
+                </button>
+            </div>
+        ),
+    };
+
+    const approvedColumns = [
+        ...baseColumns,
+        approvedActions,
+    ];
+
+    const draftColumns = [
+        ...baseColumns,
+        draftActions,
+        approvalColumn,
+    ];
+
+    return (
+        <>
+            <Toast toast={toast} onClose={hideToast} />
+            {showForm ? (
+                <BankTransferForm
+                    mode="withdrawal"
+                    draftNumber={editingTx ? editingTx.ref_number : `WITH-${String(transactions.length + 1).padStart(5, "0")}`}
+                    initialData={editingTx}
+                    bankAccounts={bankAccounts}
+                    contraAccounts={contraAccounts}
+                    onBankAccountChange={fetchContraAccounts}
+                    onClose={closeForm}
+                    onCreate={handleSubmit}
+                />
+            ) : (
+                <>
+                    <Toolbar
+                        search={{ value: search, onChange: setSearch }}
+                        actions={[{ label: '+ New Withdrawal', onClick: handleNew }]}
+                    />
+
+                    <Tabs active={tab} onChange={setTab} />
+
+                    <div className="bg-white rounded-lg shadow">
+                        {loading ? (
+                            <div className="flex justify-center items-center py-20 text-slate-500">
+                                Loading withdrawals...
+                            </div>
+                        ) : transactions.length === 0 ? (
+                            <div className="flex justify-center items-center py-20 text-slate-500">
+                                No withdrawals found
+                            </div>
+                        ) : (
+                            <DataTable
+                                columns={tab === "approved" ? approvedColumns : draftColumns}
+                                data={filtered}
+                            />
+                        )}
+                    </div>
+                </>
+            )}
+        </>
+    );
+}
