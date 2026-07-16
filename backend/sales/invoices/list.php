@@ -24,7 +24,7 @@ $validStatuses = ['DRAFT', 'APPROVED', 'VOID'];
 $contactId = $_GET['contact_id'] ?? null;
 
 try {
-    $sql = ("
+    $sql = "
         SELECT
             t.id,
             t.date,
@@ -46,7 +46,7 @@ try {
         JOIN users u ON u.id = t.created_by
         LEFT JOIN transaction_allocations ta ON ta.settled_transaction_id = t.id
         WHERE t.type = 'SALES'
-    ");
+    ";
 
     $params = [];
 

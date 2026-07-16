@@ -19,7 +19,7 @@ $type = $_GET['type'] ?? null;
 $validTypes = ['BANK', 'CASH'];
 
 try {
-    $sql = ("
+    $sql = "
         SELECT
             ba.id,
             ba.name,
@@ -35,7 +35,7 @@ try {
         FROM bank_accounts ba
         JOIN accounts a ON a.id = ba.account_id
         WHERE ba.is_active = TRUE
-    ");
+    ";
     $params = [];
     
     if ($type && in_array($type, $validTypes, true)) {

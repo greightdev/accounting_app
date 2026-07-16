@@ -23,7 +23,7 @@ $status = $status ? strtoupper($status) : null;
 $validStatuses = ['DRAFT', 'APPROVED', 'VOID'];
 
 try {
-    $sql = ("
+    $sql = "
         SELECT
             t.id,
             t.ref_number,
@@ -51,7 +51,7 @@ try {
         LEFT JOIN transactions bill ON bill.id = ta.settled_transaction_id
         LEFT JOIN tds_entries te ON te.transaction_id = t.id
         WHERE t.type = 'PAYMENT'
-    ");
+    ";
     $params = [];
 
     if ($contactId) {
