@@ -35,7 +35,7 @@ $voidReason = trim($data['void_reason'] ?? '');
 const TYPES_WITH_LEDGER = ['SALES', 'PURCHASE', 'RECEIPT', 'PAYMENT', 'BANK_DEP', 'BANK_WITH', 'TDS_PAYMENT', 'JOURNAL'];
 
 // Types where DRAFT status means no ledger entries were posted yet
-const TYPES_WITH_DRAFT = ['SALES', 'PURCHASE'];
+const TYPES_WITH_DRAFT = ['SALES', 'PURCHASE', 'BANK_DEP', 'BANK_WITH', 'JOURNAL', 'TDS_PAYMENT'];
 
 try {
     $existing = $pdo->prepare("
