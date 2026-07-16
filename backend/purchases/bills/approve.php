@@ -106,7 +106,7 @@ try {
     $narration = "Purchase Bill {$bill['ref_number']} - {$bill['vendor_name']}";
 
     $ledgerStmt->execute([$id, $purchaseId, $bill['sub_total'], 0, $bill['date'], $narration]);
-    if ($vatTotal > 0) {
+    if ($bill['vat_amount'] > 0) {
         $ledgerStmt->execute([$id, $vatReceivableId, $bill['vat_amount'], 0, $bill['date'], $narration]);
     }
     $ledgerStmt->execute([$id, $payableId, 0, $bill['total_amount'], $bill['date'], $narration]);
