@@ -3,7 +3,10 @@ import api from "../api/axios";
 import TreeNode from "../components/TreeNode";
 import Tabs from "../components/Tabs";
 import Toolbar from "../components/Toolbar";
+import DataTable from "../components/DataTable";
 import { Search, SquarePen, Trash2 } from "lucide-react";
+import Toast from "../components/Toast";
+import useToast from "../hooks/useToast";
 
 const emptyForm = {
     name: '',
@@ -84,6 +87,7 @@ export default function ChartofAccounts() {
     const [form, setForm] = useState(emptyForm);
     const [modalError, setModalError] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const { toast, showToast, hideToast } = useToast();
 
     useEffect(() => {
         fetchAll();
@@ -163,17 +167,23 @@ export default function ChartofAccounts() {
                     name: form.name,
                     account_group_id: form.account_group_id,
                 });
+
+                showToast("Account updated successfully.")
             } else {
                 await api.post('/accounts/create.php', {
                     name: form.name,
                     account_group_id: form.account_group_id,
                 });
+
+                showToast("Account created successfully.")
             }
     
             closeModal();
             fetchAll();
         } catch (err) {
-            setModalError(err.response?.data?.message ?? 'Something went wrong. Please try again.');
+            const message = err.response?.data?.message ?? 'Something went wrong. Please try again.';
+            setModalError(message);
+            showToast(message, "error");
         } finally {
             setSubmitting(false);
         }
@@ -184,20 +194,85 @@ export default function ChartofAccounts() {
     
         try {
             await api.delete('/accounts/delete.php', { data: { id } });
+            showToast("Account deleted successfully.");
             fetchAll();
         } catch (err) {
-            alert(err.response?.data?.message ?? 'Failed to delete account.');
+            showToast(err.response?.data?.message ?? 'Failed to delete account.');
         }
     };
 
     const filteredTree = filterTree(coaTree, search);
 
-    const filteredAccounts = accounts.filter((a) => 
-        a.name.toLowerCase().includes(search.toLowerCase())
-    );
+    const filteredAccounts = accounts.filter((a) => {
+        const term = search.toLowerCase();
+        const matchesSearch = 
+            a.name.toLowerCase().includes(term) ||
+            a.code?.toLowerCase().includes(term) ||
+            a.account_group_name?.toLowerCase().includes(term);
+        return matchesSearch;
+    });
+
+    const filteredGroups = groupsFlat.filter((g) => {
+        const term = search.toLowerCase();
+        const matchesSearch = 
+            g.name.toLowerCase().includes(term) ||
+            g.code?.toLowerCase().includes(term) ||
+            g.account_group_name?.toLowerCase().includes(term);
+        return matchesSearch;
+    });
+
+    const accountColumns = [
+        { key: "code", header: "Code", },
+        { key: "name", header: "Name", },
+        { key: "account_group_name", header: "Group", },
+        { key: "account_group_type", header: "Account Type", },
+        { key: "actions", header: "Action", render: (contact) => (
+            <div className="flex items-center gap-2">
+                <button
+                    onClick={() => openEditModal(contact)}
+                    className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
+                >
+                    <SquarePen size={16} />
+                </button>
+
+                <button
+                    onClick={() => handleDelete(contact.id)}
+                    className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
+                >
+                    <Trash2 size={16} />
+                </button>
+            </div>
+        ) },
+    ];
+
+    const groupColumns = [
+        { key: "code", header: "Code", },
+        { key: "name", header: "Name", },
+        { key: "parent_name", header: "Parent Group", },
+        { key: "type", header: "Group Type", },
+        { key: "actions", header: "Action", render: (contact) => (
+            <div className="flex items-center gap-2">
+                <button
+                    onClick={() => openEditModal(contact)}
+                    className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
+                >
+                    <SquarePen size={16} />
+                </button>
+
+                <button
+                    onClick={() => handleDelete(contact.id)}
+                    className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
+                >
+                    <Trash2 size={16} />
+                </button>
+            </div>
+        ) },
+    ];
 
     return (
-        <>                
+        <>
+            <Toast toast={toast} onClose={hideToast} />
+
             <Toolbar
                 search={{ value: search, onChange: setSearch }}
                 actions={[
@@ -214,11 +289,13 @@ export default function ChartofAccounts() {
                 {tab === 'tree' && (
                     <div className="bg-white rounded-lg shadow p-4">
                         {loading ? (
-                            <p className="text-sm text-gray-400 text-center py-8">Loading...</p>
+                            <div className="flex justify-center items-center py-20 text-slate-500">
+                                Loading COA Tree...
+                            </div>
                         ) : filteredTree.length === 0 ? (
-                            <p className="text-sm text-gray-400 text-center py-8">
+                            <div className="flex justify-center items-center py-20 text-slate-500">
                                 {search.trim() ? 'No account match your search.' : 'No account groups found.'}
-                            </p>
+                            </div>
                         ) : (
                             filteredTree.map((node, index) => (
                                 <TreeNode
@@ -233,109 +310,25 @@ export default function ChartofAccounts() {
                         )}
                     </div>
                 )}
-
+                
                 {/* Accounts Table */}
                 {tab === 'accounts' && (
-                    <table className="w-full overflow-hidden rounded-xl bg-white shadow-sm">
-                        <thead>
-                            <tr className="bg-slate-700 text-white">
-                                <th className="px-4 py-3 text-left font-semibold">Code</th>
-                                <th className="px-4 py-3 text-left font-semibold">Name</th>
-                                <th className="px-4 py-3 text-left font-semibold">Group</th>
-                                <th className="px-4 py-3 text-left font-semibold">Account Type</th>
-                                <th className="px-4 py-3 text-left font-semibold">Action</th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-                            {accounts
-                                .filter((a) =>
-                                    a.name.toLowerCase().includes(search.toLowerCase()) ||
-                                    a.code?.toLowerCase().includes(search.toLowerCase()) ||
-                                    a.account_group_name?.toLowerCase().includes(search.toLowerCase())
-                                )
-                                .map((a, index) => (
-                                <tr
-                                    key={a.id}
-                                    className={`
-                                        ${index % 2 === 0 ? "bg-white" : "bg-slate-50"}
-                                        border-b border-slate-100
-                                        hover:bg-slate-100 transition-colors
-                                    `}
-                                >
-                                    <td className="px-4 py-3">{a.code}</td>
-                                    <td className="px-4 py-3">{a.name}</td>
-                                    <td className="px-4 py-3">{a.account_group_name}</td>
-                                    <td className="px-4 py-3">{a.account_group_type}</td>
-                                    <td className="px-4 py-3 flex items-center gap-2">
-                                        <button
-                                            onClick={() => openEditModal(a)}
-                                            className="p-2 rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-colors"
-                                        >
-                                            <SquarePen size={16} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDelete(a.id)}
-                                            className="p-2 rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-colors"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                    <DataTable
+                        columns={accountColumns}
+                        data={filteredAccounts}
+                        loading={loading}
+                        emptyMessage="No accounts found."
+                    />
                 )}
 
                 {/* Groups Table */}
                 {tab === 'groups' && (
-                    <table className="w-full overflow-hidden rounded-xl bg-white shadow-sm">
-                        <thead>
-                            <tr className="bg-slate-700 text-white">
-                                <th className="px-4 py-3 text-left font-semibold">Code</th>
-                                <th className="px-4 py-3 text-left font-semibold">Name</th>
-                                <th className="px-4 py-3 text-left font-semibold">Parent Group</th>
-                                <th className="px-4 py-3 text-left font-semibold">Group Type</th>
-                                <th className="px-4 py-3 text-left font-semibold">Action</th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-                            {groupsFlat
-                                .filter((g) =>
-                                    g.name.toLowerCase().includes(search.toLowerCase())
-                                )
-                                .map((g, index) => (
-                                <tr
-                                    key={g.id}
-                                    className={`
-                                        ${index % 2 === 0 ? "bg-white" : "bg-slate-50"}
-                                        border-b border-slate-100
-                                        hover:bg-slate-100 transition-colors
-                                    `}
-                                >
-                                    <td className="px-4 py-3">{g.code}</td>
-                                    <td className="px-4 py-3">{g.name}</td>
-                                    <td className="px-4 py-3">{g.parent_name}</td>
-                                    <td className="px-4 py-3">{g.type}</td>
-                                    <td className="px-4 py-3 flex items-center gap-2">
-                                        <button
-                                            // onClick={() => openEditModal(a)}
-                                            className="p-2 rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-colors"
-                                        >
-                                            <SquarePen size={16} />
-                                        </button>
-                                        <button
-                                            // onClick={() => handleDelete(a.id)}
-                                            className="p-2 rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-colors"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                    <DataTable
+                        columns={groupColumns}
+                        data={filteredGroups}
+                        loading={loading}
+                        emptyMessage="No groups found"
+                    />
                 )}
 
             </div>

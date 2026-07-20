@@ -2,6 +2,17 @@ import { useEffect, useState } from "react";
 import { Search, SquarePen, Trash2 } from "lucide-react";
 import api from "../api/axios"; 
 import Toolbar from "../components/Toolbar";
+import Tabs from "../components/Tabs";
+import DataTable from "../components/DataTable";
+import Toast from "../components/Toast";
+import useToast from "../hooks/useToast";
+
+const DEFAULT_TABS = [
+    { key: 'All', label: 'All' },
+    { key: 'Customer', label: 'Customer' },
+    { key: 'Vendor', label: 'Vendor' },
+    { key: 'Employee', label: 'Employee' },
+];
 
 const emptyForm = {
     name: '',
@@ -16,24 +27,24 @@ const emptyForm = {
 export default function Contacts() {
     const [contacts, setContacts] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState('All');
     const [search, setSearch] = useState('');
+    const [tab, setTab] = useState('All')
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingContact, setEditingContact] = useState(null);
     const [form, setForm] = useState(emptyForm)
     const [modalError, setModalError] = useState('')
     const [submitting, setSubmitting] = useState(false)
+    const { toast, showToast, hideToast } = useToast();
 
     useEffect(() => {
         fetchContacts();
-    }, [filter]);
+    }, [tab]);
 
     const fetchContacts = async () => {
         setLoading(true);
         try {
-            const query = filter !== 'All' ? `?type=${filter}` : '';
-            const { data } = await api.get(`/contacts/list.php${query}`);
+            const { data } = await api.get(`/contacts/list.php?type=${tab}`);
             setContacts(data.data ?? []);
         } catch (err) {
             console.error('Failed to fetch contacts: ', err);
@@ -48,6 +59,16 @@ export default function Contacts() {
         setModalError('');
         setIsModalOpen(true);
     };
+
+    const filtered = contacts.filter((contact) => {
+        const term = search.toLowerCase();
+        return (
+            contact.name.toLowerCase().includes(term) ||
+            (contact.email ?? "").toLowerCase().includes(term) ||
+            (contact.phone ?? "").toLowerCase().includes(term) ||
+            (contact.type ?? "").toLowerCase().includes(term)
+        );
+    });
 
     const openEditModal = (contact) => {
         setEditingContact(contact);
@@ -97,6 +118,8 @@ export default function Contacts() {
                     address: form.address,
                     tds_deducted: form.tds_deducted,
                 });
+
+                showToast("Contact updated successfully.");
             } else {
                 await api.post('/contacts/create.php', {
                     name: form.name,
@@ -107,11 +130,15 @@ export default function Contacts() {
                     address: form.address,
                     tds_deducted: form.tds_deducted,
                 });
+
+                showToast("Contact added successfully.");
             }
             closeModal();
             fetchContacts();
         } catch (err) {
-            setModalError(err.response?.data?.message ?? 'Something went wrong. Please try again.');
+            const message = err.response?.data?.message ?? 'Something went wrong. Please try again.';
+            setModalError(message);
+            showToast(message, "error");
         } finally {
             setSubmitting(false);
         }
@@ -122,76 +149,57 @@ export default function Contacts() {
     
         try {
             await api.delete('/contacts/delete.php', { data: { id } });
+            showToast("Contact deleted successfully");
             fetchContacts();
         } catch (err) {
-            alert(err.response?.data?.message ?? 'Failed to delete contact.');
+            showToast(err.response?.data?.message ?? 'Failed to delete contact.');
         }
     };
 
-    const filteredContacts = contacts.filter((contact) => {
-        const term = search.toLowerCase();
+    const columns = [
+        { key: "name", header: "Name", },
+        { key: "email", header: "Email", },
+        { key: "phone", header: "Phone", },
+        { key: "type", header: "Type", },
+        { key: "actions", header: "Action", render: (contact) => (
+            <div className="flex items-center gap-2">
+                <button
+                    onClick={() => openEditModal(contact)}
+                    className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
+                >
+                    <SquarePen size={16} />
+                </button>
 
-        return (
-            contact.name.toLowerCase().includes(term) ||
-            (contact.email ?? "").toLowerCase().includes(term) ||
-            (contact.phone ?? "").toLowerCase().includes(term) ||
-            (contact.type ?? "").toLowerCase().includes(term)
-        );
-    });
+                <button
+                    onClick={() => handleDelete(contact.id)}
+                    className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
+                >
+                    <Trash2 size={16} />
+                </button>
+            </div>
+        ) },
+    ];
 
     return (
-        <>                
+        <>
+            <Toast toast={toast} onClose={hideToast} />
+
             <Toolbar
                 search={{ value: search, onChange: setSearch }}
-                filters={{ options: ['All', 'Customer', 'Vendor', 'Employee'], active: filter, onChange: setFilter }}
+                // filters={{ options: ['All', 'Customer', 'Vendor', 'Employee'], active: filter, onChange: setFilter }}
                 actions={[{ label: '+ New Contact', onClick: openCreateModal }]}
             />
 
-            <table className="w-full overflow-hidden rounded-xl bg-white shadow-sm">
-                <thead>
-                    <tr className="bg-slate-700 text-white">
-                        <th className="px-4 py-3 text-left font-semibold">Name</th>
-                        <th className="px-4 py-3 text-left font-semibold">Email</th>
-                        <th className="px-4 py-3 text-left font-semibold">Phone</th>
-                        <th className="px-4 py-3 text-left font-semibold">Type</th>
-                        <th className="px-4 py-3 text-left font-semibold">Action</th>
-                    </tr>
-                </thead>
+            <Tabs tabs={DEFAULT_TABS} active={tab} onChange={setTab} />
 
-                <tbody>
-                    {filteredContacts.map((contact, index) => (
-                        <tr
-                            key={contact.id}
-                            className={`
-                                ${index % 2 === 0 ? "bg-white" : "bg-slate-50"}
-                                border-b border-slate-100
-                                hover:bg-slate-100 transition-colors
-                            `}
-                        >
-                            <td className="px-4 py-3">{contact.name}</td>
-                            <td className="px-4 py-3">{contact.email}</td>
-                            <td className="px-4 py-3">{contact.phone}</td>
-                            <td className="px-4 py-3 capitalize">
-                                {contact.type}
-                            </td>
-                            <td className="px-4 py-3 flex items-center gap-2">
-                                <button
-                                    onClick={() => openEditModal(contact)}
-                                    className="p-2 rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-colors"
-                                >
-                                    <SquarePen size={16} />
-                                </button>
-                                <button
-                                    onClick={() => handleDelete(contact.id)}
-                                    className="p-2 rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-colors"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+            <div className="bg-white rounded-lg shadow">
+                <DataTable
+                    columns={columns}
+                    data={filtered}
+                    loading={loading}
+                    emptyMessage="No contacts found"
+                />
+            </div>
 
             {/* Modal */}
             {isModalOpen && (

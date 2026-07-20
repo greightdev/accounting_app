@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { Search, SquarePen, Trash2 } from "lucide-react";
 import Toolbar from "../components/Toolbar";
+import DataTable from "../components/DataTable";
 import api from "../api/axios";
+import Toast from "../components/Toast";
+import useToast from "../hooks/useToast";
 
 const emptyForm = {
     name: '',
@@ -28,6 +31,7 @@ export default function Items() {
     const [form, setForm] = useState(emptyForm)
     const [modalError, setModalError] = useState('')
     const [submitting, setSubmitting] = useState(false)
+    const { toast, showToast, hideToast } = useToast();
 
     useEffect(() => {
         fetchItems();
@@ -99,6 +103,7 @@ export default function Items() {
                     purchase_rate: form.purchase_rate,
                     tax_type: form.tax_type,
                 });
+                showToast("Item updated successfully.");
             } else {
                 await api.post('/items/create.php', {
                     name: form.name,
@@ -108,11 +113,14 @@ export default function Items() {
                     purchase_rate: form.purchase_rate,
                     tax_type: form.tax_type,
                 });
+                showToast("Item created successfully.");
             }
             closeModal();
             fetchItems();
         } catch (err) {
-            setModalError(err.response?.data?.message ?? 'Something went wrong. Please try again.');
+            message = err.response?.data?.message ?? 'Something went wrong. Please try again.'
+            setModalError(message);
+            showToast(message, "error")
         } finally {
             setSubmitting(false);
         }
@@ -123,9 +131,10 @@ export default function Items() {
     
         try {
             await api.delete('/items/delete.php', { data: { id } });
+            showToast("Item deleted successfully.");
             fetchItems();
         } catch (err) {
-            alert(err.response?.data?.message ?? 'Failed to delete item.');
+            showToast(err.response?.data?.message ?? 'Failed to delete item.');
         }
     };
 
@@ -137,60 +146,49 @@ export default function Items() {
         );
     });
 
+    const columns = [
+        { key: "name", header: "Name", },
+        { key: "unit", header: "Unit", },
+        { key: "hsn_sac_code", header: "HSN/SAC", },
+        { key: "selling_price", header: "Selling Price", },
+        { key: "purchase_rate", header: "Purchase Rate", },
+        { key: "tax_type", header: "Tax", },
+        { key: "actions", header: "Action", render: (contact) => (
+            <div className="flex items-center gap-2">
+                <button
+                    onClick={() => openEditModal(contact)}
+                    className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
+                >
+                    <SquarePen size={16} />
+                </button>
+
+                <button
+                    onClick={() => handleDelete(contact.id)}
+                    className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
+                >
+                    <Trash2 size={16} />
+                </button>
+            </div>
+        ) },
+    ];
+
     return (
         <>
+            <Toast toast={toast} onClose={hideToast} />
+
             <Toolbar
                 search={{ value: search, onChange: setSearch }}
                 actions={[{ label: '+ New Item', onClick: openCreateModal }]}
             />
 
-            <table className="w-full overflow-hidden rounded-xl bg-white shadow-sm">
-                <thead>
-                    <tr className="bg-slate-700 text-white">
-                        <th className="px-4 py-3 text-left font-semibold">Name</th>
-                        <th className="px-4 py-3 text-left font-semibold">Unit</th>
-                        <th className="px-4 py-3 text-left font-semibold">HSN/SAC</th>
-                        <th className="px-4 py-3 text-left font-semibold">Selling Price</th>
-                        <th className="px-4 py-3 text-left font-semibold">Purchase Rate</th>
-                        <th className="px-4 py-3 text-left font-semibold">Tax</th>
-                        <th className="px-4 py-3 text-left font-semibold">Action</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-                    {filteredItems.map((item, index) => (
-                        <tr
-                            key={item.id}
-                            className={`
-                                ${index % 2 === 0 ? "bg-white" : "bg-slate-50"}
-                                border-b border-slate-100
-                                hover:bg-slate-100 transition-colors
-                            `}
-                        >
-                            <td className="px-4 py-3">{item.name}</td>
-                            <td className="px-4 py-3">{item.unit}</td>
-                            <td className="px-4 py-3">{item.hsn_sac_code}</td>
-                            <td className="px-4 py-3">{item.selling_price}</td>
-                            <td className="px-4 py-3">{item.purchase_rate}</td>
-                            <td className="px-4 py-3">{item.tax_type}</td>
-                            <td className="px-4 py-3 flex items-center gap-2">
-                                <button
-                                    onClick={() => openEditModal(item)}
-                                    className="p-2 rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-colors"
-                                >
-                                    <SquarePen size={16} />
-                                </button>
-                                <button
-                                    onClick={() => handleDelete(item.id)}
-                                    className="p-2 rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-colors"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+            <div className="bg-white rounded-lg shadow">
+                <DataTable
+                    columns={columns}
+                    data={filteredItems}
+                    loading={loading}
+                    emptyMessage="No items found"
+                />
+            </div>
 
             {/* Modal */}
             {isModalOpen && (

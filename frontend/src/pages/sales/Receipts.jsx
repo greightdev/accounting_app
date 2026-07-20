@@ -173,22 +173,13 @@ export default function Receipts() {
                         onChange: () => setShowVoided((v) => !v),
                     }}/>
                     
-
                     <div className="bg-white rounded-lg shadow">
-                        {loading ? (
-                            <div className="flex justify-center items-center py-20 text-slate-500">
-                                Loading receipts...
-                            </div>
-                        ) : receipts.length === 0 ? (
-                            <div className="flex justify-center items-center py-20 text-slate-500">
-                                No receipts found
-                            </div>
-                        ) : (
-                            <DataTable
-                                columns={columns}
-                                data={filtered}
-                            />
-                        )}
+                        <DataTable
+                            columns={columns}
+                            data={filtered}
+                            loading={loading}
+                            emptyMessage="No receipts found"
+                        />
                     </div>
                 </>
             )}

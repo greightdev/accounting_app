@@ -241,20 +241,12 @@ export default function Bills() {
                     <Tabs active={tab} onChange={setTab} />
 
                     <div className="bg-white rounded-lg shadow">
-                        {loading ? (
-                            <div className="flex justify-center items-center py-20 text-slate-500">
-                                Loading bills...
-                            </div>
-                        ) : bills.length === 0 ? (
-                            <div className="flex justify-center items-center py-20 text-slate-500">
-                                No bills found
-                            </div>
-                        ) : (
-                            <DataTable
-                                columns={tab === "approved" ? approvedColumns : draftColumns}
-                                data={filtered}
-                            />
-                        )}
+                        <DataTable
+                            columns={tab === "approved" ? approvedColumns : draftColumns}
+                            data={filtered}
+                            loading={loading}
+                            emptyMessage="No bills found"
+                        />
                     </div>
                 </>
             )}

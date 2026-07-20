@@ -242,20 +242,12 @@ export default function Invoices() {
                     <Tabs active={tab} onChange={setTab} />
 
                     <div className="bg-white rounded-lg shadow">
-                        {loading ? (
-                            <div className="flex justify-center items-center py-20 text-slate-500">
-                                Loading invoices...
-                            </div>
-                        ) : invoices.length === 0 ? (
-                            <div className="flex justify-center items-center py-20 text-slate-500">
-                                No invoices found
-                            </div>
-                        ) : (
-                            <DataTable
-                                columns={tab === "approved" ? approvedColumns : draftColumns}
-                                data={filtered}
-                            />
-                        )}
+                        <DataTable
+                            columns={tab === "approved" ? approvedColumns : draftColumns}
+                            data={filtered}
+                            loading={loading}
+                            emptyMessage="No invoices found"
+                        />
                     </div>
                 </>
             )}
