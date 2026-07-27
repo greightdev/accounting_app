@@ -4,14 +4,13 @@ import TreeNode from "../components/TreeNode";
 import Tabs from "../components/Tabs";
 import Toolbar from "../components/Toolbar";
 import DataTable from "../components/DataTable";
-import { Search, SquarePen, Trash2 } from "lucide-react";
+import Modal from "../components/Modal";
+import { SquarePen, Trash2 } from "lucide-react";
 import Toast from "../components/Toast";
 import useToast from "../hooks/useToast";
 
-const emptyForm = {
-    name: '',
-    account_group_id: '',
-}
+const emptyAccountForm = { name: '', account_group_id: '' };
+const emptyGroupForm = { name: '', parent_id: '' };
 
 const mergeAccountsIntoTree = (tree, accounts) => {
     const accountsByGroup = {};
@@ -80,13 +79,23 @@ export default function ChartofAccounts() {
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
-    const [tab, setTab] = useState('tree')
+    const [tab, setTab] = useState('tree');
     
+    // Account Modal
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingAccount, setEditingAccount] = useState(null);
-    const [form, setForm] = useState(emptyForm);
+    const [form, setForm] = useState(emptyAccountForm);
     const [modalError, setModalError] = useState('');
     const [submitting, setSubmitting] = useState(false);
+
+    // Group Modal
+    const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+    const [editingGroup, setEditingGroup] = useState(null);
+    const [groupForm, setGroupForm] = useState(emptyGroupForm);
+    const [groupModalError, setGroupModalError] = useState('');
+    const [groupSubmitting, setGroupSubmitting] = useState(false);
+
+
     const { toast, showToast, hideToast } = useToast();
 
     useEffect(() => {
@@ -126,9 +135,10 @@ export default function ChartofAccounts() {
         }
     };
     
+    // Account Modal
     const openCreateModal = () => {
         setEditingAccount(null);
-        setForm(emptyForm);
+        setForm(emptyAccountForm);
         setModalError('');
         setIsModalOpen(true);
     };
@@ -146,7 +156,7 @@ export default function ChartofAccounts() {
     const closeModal = () => {
         setIsModalOpen(false);
         setEditingAccount(null);
-        setForm(emptyForm);
+        setForm(emptyAccountForm);
         setModalError('');
     };
     
@@ -158,24 +168,20 @@ export default function ChartofAccounts() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setModalError('');
+        
         setSubmitting(true);
     
         try {
             if (editingAccount) {
                 await api.put('/accounts/update.php', {
                     id: editingAccount.id,
-                    name: form.name,
-                    account_group_id: form.account_group_id,
+                    ...form
                 });
 
                 showToast("Account updated successfully.")
             } else {
-                await api.post('/accounts/create.php', {
-                    name: form.name,
-                    account_group_id: form.account_group_id,
-                });
-
-                showToast("Account created successfully.")
+                await api.post('/accounts/create.php', form);
+                showToast("Account created successfully.");
             }
     
             closeModal();
@@ -197,7 +203,88 @@ export default function ChartofAccounts() {
             showToast("Account deleted successfully.");
             fetchAll();
         } catch (err) {
-            showToast(err.response?.data?.message ?? 'Failed to delete account.');
+            showToast(err.response?.data?.message ?? 'Failed to delete account.',"error");
+        }
+    };
+
+    // Group Modal
+    const openCreateGroupModal = () => {
+        setEditingGroup(null);
+        setGroupForm(emptyGroupForm);
+        setGroupModalError('');
+        setIsGroupModalOpen(true);
+    };
+
+    const openEditGroupModal = (group) => {
+        setEditingGroup(group);
+        setGroupForm({
+            name: group.name,
+            parent_id: group.parent_id,
+        });
+        setGroupModalError('');
+        setIsGroupModalOpen(true);
+    };
+    
+    const closeGroupModal = () => {
+        setIsGroupModalOpen(false);
+        setEditingGroup(null);
+        setGroupForm(emptyGroupForm);
+        setGroupModalError('');
+    };
+    
+    const handleGroupChange = (e) => {
+        const { name, value } = e.target;
+        setGroupForm((prev) => ({ ...prev, [name]: value }));
+    };
+
+    const handleGroupSubmit = async (e) => {
+        e.preventDefault();
+        setGroupModalError('');
+
+        if (!groupForm.name.trim()) {
+            setGroupModalError("Group name is required.");
+            return;
+        }
+        if (!groupForm.parent_id) {
+            setGroupModalError("Parent group is required.");
+            return;
+        }
+        
+        setGroupSubmitting(true);
+    
+        try {
+            const payload = {
+                name: groupForm.name,
+                parent_id: groupForm.parent_id || null,
+            };
+            if (editingGroup) {
+                await api.put('/account_group/update.php', { id: editingGroup.id, ...payload });
+                showToast("Account group updated successfully.")
+            } else {
+                await api.post('/account_group/create.php', payload);
+                showToast("Account group created successfully.");
+            }
+    
+            closeGroupModal();
+            fetchAll();
+        } catch (err) {
+            const message = err.response?.data?.message ?? 'Something went wrong. Please try again.';
+            setGroupModalError(message);
+            showToast(message, "error");
+        } finally {
+            setGroupSubmitting(false);
+        }
+    };
+    
+    const handleGroupDelete = async (id) => {
+        if (!window.confirm('Are you sure you want to delete this account group?')) return;
+    
+        try {
+            await api.delete('/account_group/delete.php', { data: { id } });
+            showToast("Account group deleted successfully.");
+            fetchAll();
+        } catch (err) {
+            showToast(err.response?.data?.message ?? 'Failed to delete account group.', "error");
         }
     };
 
@@ -226,17 +313,17 @@ export default function ChartofAccounts() {
         { key: "name", header: "Name", },
         { key: "account_group_name", header: "Group", },
         { key: "account_group_type", header: "Account Type", },
-        { key: "actions", header: "Action", render: (contact) => (
+        { key: "actions", header: "Action", render: (account) => (
             <div className="flex items-center gap-2">
                 <button
-                    onClick={() => openEditModal(contact)}
+                    onClick={() => openEditModal(account)}
                     className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
                 >
                     <SquarePen size={16} />
                 </button>
 
                 <button
-                    onClick={() => handleDelete(contact.id)}
+                    onClick={() => handleDelete(account.id)}
                     className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
                 >
                     <Trash2 size={16} />
@@ -250,17 +337,17 @@ export default function ChartofAccounts() {
         { key: "name", header: "Name", },
         { key: "parent_name", header: "Parent Group", },
         { key: "type", header: "Group Type", },
-        { key: "actions", header: "Action", render: (contact) => (
+        { key: "actions", header: "Action", render: (group) => (
             <div className="flex items-center gap-2">
                 <button
-                    onClick={() => openEditModal(contact)}
+                    onClick={() => openEditGroupModal(group)}
                     className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
                 >
                     <SquarePen size={16} />
                 </button>
 
                 <button
-                    onClick={() => handleDelete(contact.id)}
+                    onClick={() => handleGroupDelete(group.id)}
                     className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
                 >
                     <Trash2 size={16} />
@@ -276,7 +363,7 @@ export default function ChartofAccounts() {
             <Toolbar
                 search={{ value: search, onChange: setSearch }}
                 actions={[
-                    { label: '+ Add Group', onClick: () => {} },
+                    { label: '+ Add Group', onClick: openCreateGroupModal },
                     { label: '+ Add Account', onClick: openCreateModal },
                 ]}
             />
@@ -304,6 +391,8 @@ export default function ChartofAccounts() {
                                     isLast={index === filteredTree.length -1}
                                     onEdit={openEditModal}
                                     onDelete={handleDelete}
+                                    onEditGroup={openEditGroupModal}
+                                    onDeleteGroup={handleGroupDelete}
                                     forceExpand={!!search.trim()}
                                 />
                             ))
@@ -333,79 +422,87 @@ export default function ChartofAccounts() {
 
             </div>
 
-            {/* Modal */}
+            {/* Account Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-7">
-                        <h2 className="text-lg font-semibold text-gray-900 mb-1">
-                            {editingAccount ? 'Edit Account' : 'Add Account'}
-                        </h2>
-                        <p className="text-sm text-gray-500 mb-6">
-                            {editingAccount ? 'Update account details below.' : 'Create a new account.'}
-                        </p>
-        
-                        {editingAccount?.is_system && (
-                            <div className="mb-5 px-4 py-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm">
-                                This is a system account — its name and group cannot be changed.
-                            </div>
-                        )}
-        
-                        {modalError && (
-                            <div className="mb-5 px-4 py-2.5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm">
-                                {modalError}
-                            </div>
-                        )}
-        
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">Account Name</label>
-                                <input
-                                    name="name"
-                                    value={form.name}
-                                    onChange={handleChange}
-                                    disabled={editingAccount?.is_system}
-                                    placeholder="e.g. Office Rent"
-                                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
-                                />
-                            </div>
-            
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">Account Group</label>
-                                <select
-                                    name="account_group_id"
-                                    value={form.account_group_id}
-                                    onChange={handleChange}
-                                    disabled={editingAccount?.is_system}
-                                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
-                                >
-                                <option value="">Select a group</option>
-                                    {groupsFlat.map((group) => (
-                                        <option key={group.id} value={group.id}>{group.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            
-                            <div className="flex gap-3 pt-4">
-                                <button
-                                    type="button"
-                                    onClick={closeModal}
-                                    className="flex-1 py-2.5 rounded-lg border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50 transition"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={submitting}
-                                    className="flex-1 py-2.5 rounded-lg bg-slate-700 text-white text-sm font-semibold hover:bg-slate-800 transition disabled:opacity-60 flex items-center justify-center"
-                                >
-                                {submitting ? (
-                                    <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                                        ) : editingAccount ? 'Save Changes' : 'Create Account'}
-                                </button>
-                            </div>
-                        </form>
+                <Modal
+                    title={editingAccount ? 'Edit Account' : 'Add Account'}
+                    subtitle={editingAccount ? 'Update account details below.' : 'Create a new account.'}
+                    warning={editingAccount?.is_system ? 'This is a system account - its name and group cannot be changed.' : null}
+                    error={modalError}
+                    onClose={closeModal}
+                    onSubmit={handleSubmit}
+                    submitting={submitting}
+                    submitLabel={editingAccount ? 'Save Changes' : 'Create Account'}
+                >
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Account Name</label>
+                        <input
+                            name="name"
+                            value={form.name}
+                            onChange={handleChange}
+                            disabled={editingAccount?.is_system}
+                            placeholder="e.g. Office Rent"
+                            className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                        />
                     </div>
-                </div>
+    
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Account Group</label>
+                        <select
+                            name="account_group_id"
+                            value={form.account_group_id}
+                            onChange={handleChange}
+                            disabled={editingAccount?.is_system}
+                            className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                        <option value="">Select a group</option>
+                            {groupsFlat.map((group) => (
+                                <option key={group.id} value={group.id}>{group.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                </Modal>
+            )}
+
+            {/* Group Modal */}
+            {isGroupModalOpen && (
+                <Modal
+                    title={editingGroup ? 'Edit Account Group' : 'Add Account Group'}
+                    subtitle={editingGroup ? 'Update group details below.' : 'Create a new account group.'}
+                    error={groupModalError}
+                    onClose={closeGroupModal}
+                    onSubmit={handleGroupSubmit}
+                    submitting={groupSubmitting}
+                    submitLabel={editingGroup ? 'Save Changes' : 'Create Group'}
+                >
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Group Name</label>
+                        <input
+                            name="name"
+                            value={groupForm.name}
+                            onChange={handleGroupChange}
+                            placeholder="e.g. Fixed Assets"
+                            className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
+                        />
+                    </div>
+    
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Parent Group</label>
+                        <select
+                            name="parent_id"
+                            value={groupForm.parent_id}
+                            onChange={handleGroupChange}
+                            className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
+                        >
+                        <option value="">Select parent group</option>
+                            {groupsFlat
+                                .filter((group) => !editingGroup || group.id !== editingGroup.id)
+                                .map((group) => (
+                                    <option key={group.id} value={group.id}>{group.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                </Modal>
             )}
         </>
     );

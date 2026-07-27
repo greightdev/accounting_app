@@ -4,6 +4,7 @@ import api from "../api/axios";
 import Toolbar from "../components/Toolbar";
 import Tabs from "../components/Tabs";
 import DataTable from "../components/DataTable";
+import Modal from "../components/Modal";
 import Toast from "../components/Toast";
 import useToast from "../hooks/useToast";
 
@@ -203,128 +204,100 @@ export default function Contacts() {
 
             {/* Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-7">
-                        <h2 className="text-lg font-semibold text-gray-900 mb-1">
-                            {editingContact ? 'Edit Contact' : 'Add Contact'}
-                        </h2>
-                        <p className="text-sm text-gray-500 mb-6">
-                            {editingContact ? 'Update contact details below.' : 'Enter the contact details below.'}
-                        </p>
-
-                        {modalError && (
-                            <div className="mb-5 px-4 py-2.5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm">
-                                {modalError}
-                            </div>
-                        )}
-
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">Name</label>
-                                <input
-                                    name="name"
-                                    value={form.name}
-                                    onChange={handleChange}
-                                    placeholder="e.g. Kathmandu Traders Pvt. Ltd."
-                                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Type</label>
-                                    <select
-                                        name="type"
-                                        value={form.type}
-                                        onChange={handleChange}
-                                        className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
-                                    >
-                                        <option value="">Select</option>
-                                        <option value="Customer">Customer</option>
-                                        <option value="Vendor">Vendor</option>
-                                        <option value="Employee">Employee</option>
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">PAN</label>
-                                    <input
-                                        name="pan"
-                                        value={form.pan}
-                                        onChange={handleChange}
-                                        placeholder="123456789"
-                                        className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone</label>
-                                    <input
-                                        name="phone"
-                                        value={form.phone}
-                                        onChange={handleChange}
-                                        placeholder="98XXXXXXXX"
-                                        className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-                                    <input
-                                        name="email"
-                                        type="email"
-                                        value={form.email}
-                                        onChange={handleChange}
-                                        placeholder="contact@example.com"
-                                        className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">Address</label>
-                                <input
-                                    name="address"
-                                    value={form.address}
-                                    onChange={handleChange}
-                                    placeholder="Kathmandu, Nepal"
-                                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
-                                />
-                            </div>
-
-                            <label className="flex items-center gap-2.5 py-1">
-                                <input
-                                    type="checkbox"
-                                    name="tds_deducted"
-                                    checked={form.tds_deducted}
-                                    onChange={handleChange}
-                                    className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-300"
-                                />
-                                <span className="text-sm text-gray-700">This contact deducts TDS on payments to us</span>
-                            </label>
-
-                            <div className="flex gap-3 pt-4">
-                                <button
-                                    type="button"
-                                    onClick={closeModal}
-                                    className="flex-1 py-2.5 rounded-lg border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50 transition"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={submitting}
-                                    className="flex-1 py-2.5 rounded-lg bg-slate-700 text-white text-sm font-semibold hover:bg-slate-800 transition disabled:opacity-60 flex items-center justify-center"
-                                >
-                                    {submitting ? (
-                                        <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                                        ) : editingContact ? 'Save Changes' : 'Create Contact'}
-                                </button>
-                            </div>
-                        </form>
+                <Modal
+                    title={editingContact ? 'Edit Contact' : 'Add Contact'}
+                    subtitle={editingContact ? 'Update contact details below.' : 'Enter the contact details below.'}
+                    error={modalError}
+                    onClose={closeModal}
+                    onSubmit={handleSubmit}
+                    submitting={submitting}
+                    submitLabel={editingContact ? 'Save Changes' : 'Create Contact'}
+                >
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Name</label>
+                        <input
+                            name="name"
+                            value={form.name}
+                            onChange={handleChange}
+                            placeholder="e.g. Kathmandu Traders Pvt. Ltd."
+                            className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
+                        />
                     </div>
-                </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Type</label>
+                            <select
+                                name="type"
+                                value={form.type}
+                                onChange={handleChange}
+                                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
+                            >
+                                <option value="">Select</option>
+                                <option value="Customer">Customer</option>
+                                <option value="Vendor">Vendor</option>
+                                <option value="Employee">Employee</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">PAN</label>
+                            <input
+                                name="pan"
+                                value={form.pan}
+                                onChange={handleChange}
+                                placeholder="123456789"
+                                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone</label>
+                            <input
+                                name="phone"
+                                value={form.phone}
+                                onChange={handleChange}
+                                placeholder="98XXXXXXXX"
+                                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+                            <input
+                                name="email"
+                                type="email"
+                                value={form.email}
+                                onChange={handleChange}
+                                placeholder="contact@example.com"
+                                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Address</label>
+                        <input
+                            name="address"
+                            value={form.address}
+                            onChange={handleChange}
+                            placeholder="Kathmandu, Nepal"
+                            className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
+                        />
+                    </div>
+
+                    <label className="flex items-center gap-2.5 py-1">
+                        <input
+                            type="checkbox"
+                            name="tds_deducted"
+                            checked={form.tds_deducted}
+                            onChange={handleChange}
+                            className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-300"
+                        />
+                        <span className="text-sm text-gray-700">TDS deducted</span>
+                    </label>
+                </Modal>
             )}        
         </>
     );

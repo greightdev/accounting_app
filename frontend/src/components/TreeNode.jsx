@@ -1,7 +1,15 @@
 import { useEffect, useState } from "react";
 import { ChevronRight, ChevronDown, Pencil, Trash2 } from "lucide-react";
 
-export default function TreeNode({ node, level = 0, onEdit, onDelete, forceExpand = false }) {
+export default function TreeNode({
+    node,
+    level = 0,
+    onEdit,
+    onDelete,
+    onEditGroup,
+    onDeleteGroup,
+    forceExpand = false
+}) {
     const [expanded, setExpanded] = useState(true);
     
     useEffect(() => {
@@ -44,24 +52,45 @@ export default function TreeNode({ node, level = 0, onEdit, onDelete, forceExpan
 
     return (
         <div>
-            <div
-                className="flex items-center gap-2 py-1 hover:bg-gray-100 rounded cursor-pointer"
-                onClick={() => hasChildren && setExpanded((e) => !e)}
-            >
-                {hasChildren ? (
-                    expanded
-                        ? <ChevronDown size={16} className="text-gray-500 shrink-0" />
-                        : <ChevronRight size={16} className="text-gray-500 shrink-0" />
-                    
-                ) : (
-                    <div className="w-4 shrink-0" />
+            <div className="group flex items-center gap-4 py-1 rounded hover:bg-gray-100">
+                <div
+                    className="flex items-center gap-2 cursor-pointer"
+                    onClick={() => hasChildren && setExpanded((e) => !e)}
+                >
+                    {hasChildren ? (
+                        expanded
+                            ? <ChevronDown size={16} className="text-gray-500 shrink-0" />
+                            : <ChevronRight size={16} className="text-gray-500 shrink-0" />
+                        
+                    ) : (
+                        <div className="w-4 shrink-0" />
+                    )}
+
+                    <span className="font-semibold text-slate-800">
+                        {node.code ? `${node.code} ~ ` : ''}{node.name}
+                    </span>
+                </div>
+
+                {onEditGroup && onDeleteGroup && (
+                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                        <button
+                            onClick={() => onEditGroup(node)}
+                            className="flex items-center justify-center text-slate-500 hover:text-slate-800"
+                            title="Edit Group"
+                        >
+                            <Pencil size={14} />
+                        </button>
+                        <button
+                            onClick={() => onDeleteGroup(node.id)}
+                            className="flex items-center justify-center text-slate-500 hover:text-slate-800"
+                            title="Delete Group"
+                        >
+                            <Trash2 size={14} />
+                        </button>
+                    </div>
                 )}
-
-                <span className={"font-semibold text-slate-800"}>
-                    {node.code ? `${node.code} ~ ` : ''}{node.name}
-                </span>
             </div>
-
+            
             {hasChildren && expanded && (
                 <div className="ml-2 border-l border-gray-300">
                     {node.children.map((child) => (
@@ -71,6 +100,9 @@ export default function TreeNode({ node, level = 0, onEdit, onDelete, forceExpan
                                 level={level + 1}
                                 onEdit={onEdit}
                                 onDelete={onDelete}
+                                onEditGroup={onEditGroup}
+                                onDeleteGroup={onDeleteGroup}
+                                forceExpand={forceExpand}
                             />
                         </div>
                     ))}

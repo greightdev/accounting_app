@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Search, SquarePen, Trash2 } from "lucide-react";
 import Toolbar from "../components/Toolbar";
 import DataTable from "../components/DataTable";
+import Modal from "../components/Modal";
 import api from "../api/axios";
 import Toast from "../components/Toast";
 import useToast from "../hooks/useToast";
@@ -192,118 +193,90 @@ export default function Items() {
 
             {/* Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-7">
-                        <h2 className="text-lg font-semibold text-gray-900 mb-1">
-                            {editingItem ? 'Edit Item' : 'Add Item'}
-                        </h2>
-                        <p className="text-sm text-gray-500 mb-6">
-                            {editingItem ? 'Update item details below.' : 'Enter the item details below.'}
-                        </p>
-
-                        {modalError && (
-                            <div className="mb-5 px-4 py-2.5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm">
-                                {modalError}
-                            </div>
-                        )}
-
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">Name</label>
-                                <input
-                                    name="name"
-                                    value={form.name}
-                                    onChange={handleChange}
-                                    placeholder="e.g. Web Development Item"
-                                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Unit</label>
-                                    <input
-                                        name="unit"
-                                        value={form.unit}
-                                        onChange={handleChange}
-                                        placeholder="hrs, kg..."
-                                        className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">HSN/SAC Code</label>
-                                    <input
-                                        name="hsn_sac_code"
-                                        value={form.hsn_sac_code}
-                                        onChange={handleChange}
-                                        placeholder="1234"
-                                        className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Selling Price</label>
-                                    <input
-                                        name="selling_price"
-                                        type="number"
-                                        min="0"
-                                        value={form.selling_price}
-                                        onChange={handleChange}
-                                        placeholder="0.00"
-                                        className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Purchase Rate</label>
-                                    <input
-                                        name="purchase_rate"
-                                        type="number"
-                                        min="0"
-                                        value={form.purchase_rate}
-                                        onChange={handleChange}
-                                        className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">Tax Type</label>
-                                <select
-                                    name="tax_type"
-                                    value={form.tax_type}
-                                    onChange={handleChange}
-                                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
-                                >
-                                    <option value="">Select</option>
-                                    <option value="VAT13">VAT 13%</option>
-                                    <option value="Exempt">Exempt</option>
-                                </select>
-                            </div>
-
-                            <div className="flex gap-3 pt-4">
-                                <button
-                                    type="button"
-                                    onClick={closeModal}
-                                    className="flex-1 py-2.5 rounded-lg border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50 transition"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={submitting}
-                                    className="flex-1 py-2.5 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-black transition disabled:opacity-60 flex items-center justify-center"
-                                >
-                                    {submitting ? (
-                                        <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                                        ) : editingItem ? 'Save Changes' : 'Create Item'}
-                                </button>
-                            </div>
-                        </form>
+                <Modal
+                    title={editingItem ? 'Edit Item' : 'Add Item'}
+                    subtitle={editingItem ? 'Update item details below.' : 'Enter the item details below.'}
+                    error={modalError}
+                    onClose={closeModal}
+                    onSubmit={handleSubmit}
+                    submitting={submitting}
+                    submitLabel={editingItem ? 'Save Changes' : 'Create Item'}
+                >
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Name</label>
+                        <input
+                            name="name"
+                            value={form.name}
+                            onChange={handleChange}
+                            placeholder="e.g. Web Development Item"
+                            className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
+                        />
                     </div>
-                </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Unit</label>
+                            <input
+                                name="unit"
+                                value={form.unit}
+                                onChange={handleChange}
+                                placeholder="hrs, kg..."
+                                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">HSN/SAC Code</label>
+                            <input
+                                name="hsn_sac_code"
+                                value={form.hsn_sac_code}
+                                onChange={handleChange}
+                                placeholder="1234"
+                                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Selling Price</label>
+                            <input
+                                name="selling_price"
+                                type="number"
+                                min="0"
+                                value={form.selling_price}
+                                onChange={handleChange}
+                                placeholder="0.00"
+                                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Purchase Rate</label>
+                            <input
+                                name="purchase_rate"
+                                type="number"
+                                min="0"
+                                value={form.purchase_rate}
+                                onChange={handleChange}
+                                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Tax Type</label>
+                        <select
+                            name="tax_type"
+                            value={form.tax_type}
+                            onChange={handleChange}
+                            className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
+                        >
+                            <option value="">Select</option>
+                            <option value="VAT13">VAT 13%</option>
+                            <option value="Exempt">Exempt</option>
+                        </select>
+                    </div>
+                </Modal>
             )}
         </>
     );
