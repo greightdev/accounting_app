@@ -32,10 +32,83 @@ $currentPassword = $data['current_password'] ?? '';
 $newPassword = $data['new_password'] ?? '';
 $confirmPassword = $data['confirm_password'] ?? '';
 
+$verifyOnly = $newPassword === '' && $confirmPassword === '';
+
+if ($currentPassword === '') {
+    http_response_code(400);
+    echo json_encode([
+        "success" => false,
+        "message" => "Current password is required."
+    ]);
+    exit();
+}
+
+// Fetch password hash and lockout state from DB
+$stmt = $pdo->prepare("
+    SELECT password, failed_login_attempts, lockout_until, TIMESTAMPDIFF(SECOND, NOW(), lockout_until) AS lockout_remaining
+    FROM users
+    WHERE id = ? AND is_active = TRUE
+    LIMIT 1
+");
+$stmt->execute([$_SESSION['user_id']]);
+$user = $stmt->fetch();
+
+if (!$user) {
+    http_response_code(404);
+    echo json_encode([
+        "success" => false,
+        "message" => "User account not found."
+    ]);
+    exit();
+}
+
+if (($remaining = isLockedOut($user)) !== null) {
+    destroySession();
+    http_response_code(429);
+    echo json_encode([
+        "success" => false,
+        "message" => "Too many failed attempts. You've been logged out for security.",
+        "retry_after" => $remaining
+    ]);
+    exit();
+}
+
+if (!password_verify($currentPassword, $user['password'])) {
+    recordFailedAttempt($pdo, $_SESSION['user_id'], $user['failed_login_attempts']);
+
+    $newCount = $user['failed_login_attempts'] + 1;
+    if ($newCount >= MAX_FAILED_ATTEMPTS) {
+        destroySession();
+        http_response_code(429);
+        echo json_encode([
+            "success" => false,
+            "message" => "Too many failed attempts. You've been logged out for security."
+        ]);
+        exit();
+    }
+
+    http_response_code(401);
+    echo json_encode([
+        "success" => false,
+        "message" => "Current password is incorrect."
+    ]);
+    exit();
+}
+
+resetFailedAttempts($pdo, $_SESSION['user_id']);
+
+if ($verifyOnly) {
+    http_response_code(200);
+    echo json_encode([
+        "success" => true,
+        "message" => "Password verified."
+    ]);
+    exit();
+}
+
 // Validation
 $errors = [];
 
-if ($currentPassword === '') $errors[] = "Current password is required.";
 if ($newPassword === '') $errors[] = "New password is required.";
 if ($confirmPassword === '') $errors[] = "Please confirm your new password.";
 
@@ -51,7 +124,7 @@ if ($errors) {
 if ($newPassword !== $confirmPassword) {
     http_response_code(422);
     echo json_encode([
-        "success" => false, 
+        "success" => false,
         "message" => "New passwords do not match."
     ]);
     exit();
@@ -76,35 +149,6 @@ if (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/', $newPasswo
     exit();
 }
 
-// Fetch password hash from DB
-$stmt = $pdo->prepare("
-    SELECT password
-    FROM users
-    WHERE id = ? AND is_active = TRUE
-    LIMIT 1
-");
-$stmt->execute([$_SESSION['user_id']]);
-$user = $stmt->fetch();
-
-if (!$user) {
-    http_response_code(404);
-    echo json_encode([
-        "success" => false,
-        "message" => "User account not found."
-    ]);
-    exit();
-}
-
-// Verify current password
-if (!password_verify($currentPassword, $user['password'])) {
-    http_response_code(401);
-    echo json_encode([
-        "success" => false,
-        "message" => "Current password is incorrect."
-    ]);
-    exit;
-}
-
 // Hash & save new password
 $newHash = password_hash($newPassword, PASSWORD_BCRYPT);
 
@@ -116,8 +160,7 @@ $update = $pdo->prepare("
 $update->execute([$newHash, $_SESSION['user_id']]);
 
 // Force re-login after password change
-session_unset();
-session_destroy();
+destroySession();
 
 http_response_code(200);
 echo json_encode([

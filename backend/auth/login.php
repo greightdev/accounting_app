@@ -72,7 +72,7 @@ if ($errors) {
 
 // Find user
 $stmt = $pdo->prepare("
-    SELECT id, name, email, password, role
+    SELECT id, name, email, password, role, failed_login_attempts, lockout_until, TIMESTAMPDIFF(SECOND, NOW(), lockout_until) AS lockout_remaining
     FROM users
     WHERE email = ? AND is_active = TRUE
     LIMIT 1
@@ -81,12 +81,21 @@ $stmt = $pdo->prepare("
 $stmt->execute([$email]);
 $user = $stmt->fetch();
 
+// Check lockout
+if ($user && ($remaining = isLockedOut($user)) !== null) {
+    http_response_code(429);
+    echo json_encode([
+        "success" => false,
+        "message" => "Too many failed attempts. Try again later.",
+        "retry_after" => $remaining
+    ]);
+    exit();
+}
+
 // User not found or incorrect password
 if (!$user || !password_verify($password, $user['password'])) {
-    $_SESSION['login_attempts'] = ($_SESSION['login_attempts'] ?? 0) + 1;
-
-    if ($_SESSION['login_attempts'] > 5 && !isset($_SESSION['lockout_start'])) {
-        $_SESSION['lockout_start'] = time();
+    if ($user) {
+        recordFailedAttempt($pdo, $user['id'], $user['failed_login_attempts']);
     }
 
     http_response_code(401);
@@ -105,7 +114,8 @@ $_SESSION["email"] = $user['email'];
 $_SESSION["role"] = $user['role'];
 $_SESSION['logged_in'] = true;
 $_SESSION['login_time'] = time();
-$_SESSION['login_attempts'] = 0;
+
+resetFailedAttempts($pdo, $user['id']);
 
 http_response_code(200);
 echo json_encode([
