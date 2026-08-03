@@ -124,7 +124,7 @@ try {
         exit();
     }
 
-    if (round($totalDebit, 2) !== round($totalCredit, 2)) {
+    if (abs(round($totalDebit, 2) - round($totalCredit, 2)) > 0.01) {
         http_response_code(422);
         echo json_encode([
             "success" => false,
@@ -159,6 +159,28 @@ try {
     ");
     foreach ($validLines as $line) {
         $lineStmt->execute([$id, $line['account_id'], $line['debit'], $line['credit'], $line['narration']]);
+    }
+
+    // Replace tds_entries
+    $pdo->prepare("
+        DELETE FROM tds_entries
+        WHERE transaction_id = ? AND tds_type = 'EXPENSE' AND is_paid = FALSE
+    ")->execute([$id]);
+
+    $tdsContext = $data['tds_context'] ?? null;
+    
+    if ($tdsContext) {
+        $contactId = $tdsContext['contact_id'] ?? null;
+        $pan = trim($tdsContext['pan'] ?? '');
+        $fiscalYear = trim($tdsContext['fiscal_year'] ?? '');
+        $tdsAmount = (float)($tdsContext['tds_amount'] ?? 0);
+
+        if ($contactId && $fiscalYear && $tdsAmount > 0) {
+            $pdo->prepare("
+                INSERT INTO tds_entries (transaction_id, contact_id, pan, tds_amount, tds_type, fiscal_year, date, is_paid)
+                VALUES (?, ?, ?, ?, 'EXPENSE', ?, ?, FALSE)
+            ")->execute([$id, $contactId, $pan ?: null, $tdsAmount, $fiscalYear, $date]);
+        }
     }
 
     $pdo->commit();

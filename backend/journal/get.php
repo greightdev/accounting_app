@@ -75,6 +75,15 @@ try {
     $lineStmt->execute([$id]);
     $journal['lines'] = $lineStmt->fetchAll();
 
+    // Restore TDS Expense context, if this journal has one
+    $tdsStmt = $pdo->prepare("
+        SELECT contact_id, pan, fiscal_year, tds_amount
+        FROM tds_entries
+        WHERE transaction_id = ? AND tds_type = 'EXPENSE'
+    ");
+    $tdsStmt->execute([$id]);
+    $journal['tds_context'] = $tdsStmt->fetch() ?: null;
+
     http_response_code(200);
     echo json_encode([
         "success" => true,

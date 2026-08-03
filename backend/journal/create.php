@@ -196,6 +196,41 @@ try {
         }
     }
 
+    // Link journal to TDS
+    $tdsContext = $data['tds_context'] ?? null;
+
+    if ($tdsContext) {
+        $contactId = $tdsContext['contact_id'] ?? null;
+        $pan = trim($tdsContext['pan'] ?? '');
+        $fiscalYear = trim($tdsContext['fiscal_year'] ?? '');
+        $tdsAmount = (float)($tdsContext['tds_amount'] ?? 0);
+        
+        if (!$contactId || !$fiscalYear || $tdsAmount <= 0) {
+            $pdo->rollBack();
+            http_response_code(400);
+            echo json_encode([
+                "success" => false,
+                "message" => "TDS context requires a contact, fiscal year and amount."
+            ]);
+            exit();
+        }
+
+        $tdsStmt = $pdo->prepare("
+            INSERT INTO tds_entries (
+                transaction_id,
+                contact_id,
+                pan,
+                tds_amount,
+                tds_type,
+                fiscal_year,
+                date,
+                is_paid
+            )
+            VALUES (?, ?, ?, ?, 'EXPENSE', ?, ?, FALSE)
+        ");
+        $tdsStmt->execute([$txId, $contactId, $pan ?: null, $tdsAmount, $fiscalYear, $date]);
+    }
+
     $pdo->commit();
 
     http_response_code(201);
