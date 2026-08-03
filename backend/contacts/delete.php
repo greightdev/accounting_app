@@ -60,7 +60,7 @@ try {
     $usageCheck = $pdo->prepare("
         SELECT id
         FROM transactions
-        WHERE contact_id = ?
+        WHERE contact_id = ? AND status != 'VOID'
         LIMIT 1
     ");
     $usageCheck->execute([$id]);

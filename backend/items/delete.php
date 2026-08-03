@@ -58,9 +58,11 @@ try {
 
     // Block delete if the item has been used in any transactions
     $usageCheck = $pdo->prepare("
-        SELECT id
-        FROM transaction_items
-        WHERE item_id = ?
+        SELECT ti.id, t.status
+        FROM transaction_items ti
+        LEFT JOIN transactions t
+        ON ti.transaction_id = t.id
+        WHERE ti.item_id = ? AND t.status != 'VOID'
         LIMIT 1
     ");
     $usageCheck->execute([$id]);
