@@ -24,7 +24,7 @@ if (!$data) {
     http_response_code(400);
     echo json_encode([
         "success" => false,
-        "message" => "No input received.."
+        "message" => "No input received."
     ]);
     exit();
 }
@@ -68,33 +68,35 @@ try {
         exit();
     }
 
-    // // System ledgers (the 13 fixed ones): block name/group changes
-    // if ($account['is_system'] && $name !== '' && $name !== $account['name']) {
-    //     http_response_code(403);
-    //     echo json_encode([
-    //         "success" => false,
-    //         "message" => "This is a system ledger and its name cannot be changed."
-    //     ]);
-    //     exit();
-    // }
+    // System ledgers
+    if ($account['is_system'] && $name !== $account['name']) {
+        http_response_code(403);
+        echo json_encode([
+            "success" => false,
+            "message" => "This is a system ledger and its name cannot be changed."
+        ]);
+        exit();
+    }
 
-    // if ($account['is_system'] && isset($data['account_group_id']) && $data['account_group_id'] != $account['account_group_id']) {
-    //     http_response_code(403);
-    //     echo json_encode([
-    //         "success" => false,
-    //         "message" => "This is a system ledger and its account group cannot be changed."
-    //     ]);
-    //     exit();
-    // }
+    if ($account['is_system'] && (int)$accountGroupId !== (int)$account['account_group_id']) {
+        http_response_code(403);
+        echo json_encode([
+            "success" => false,
+            "message" => "This is a system ledger and its account group cannot be changed."
+        ]);
+        exit();
+    }
 
     // Validate new account group exists
-    $groupCheck = $pdo->prepare("
-        SELECT id
+    $groupStmt = $pdo->prepare("
+        SELECT id, name, code
         FROM account_groups
         WHERE id = ? AND is_active = TRUE
     ");
-    $groupCheck->execute([$accountGroupId]);
-    if (!$groupCheck->fetch()) {
+    $groupStmt->execute([$accountGroupId]);
+    $newGroup = $groupStmt->fetch();
+
+    if (!$newGroup) {
         http_response_code(422);
         echo json_encode([
             "success" => false,
@@ -115,7 +117,7 @@ try {
             http_response_code(422);
             echo json_encode([
                 "success" => false,
-                "message" => "A account with this name already exists."
+                "message" => "An account with this name already exists."
             ]);
             exit();
         }
@@ -126,15 +128,25 @@ try {
     $newCode = $account['code'];
 
     if ($groupChanged) {
-        $groupStmt = $pdo->prepare("
-            SELECT id, code
-            FROM account_groups
-            WHERE id = ? AND is_active = TRUE
-        ");
-        $groupStmt->execute([$accountGroupId]);
-        $group = $groupStmt->fetch();
-        $newCode = generateAccountCode($pdo, $group['id'], $group['code'], $id);
+        $newCode = generateAccountCode($pdo, $newGroup['id'], $newGroup['code'], $id);
     }
+
+    $wasBankOrCash = false;
+    $oldGroupStmt = $pdo->prepare("
+        SELECT name
+        FROM account_groups
+        WHERE id = ?
+    ");
+    $oldGroupStmt->execute([$account['account_group_id']]);
+    $oldGroup = $oldGroupStmt->fetch();
+
+    if ($oldGroup && in_array($oldGroup['name'], ['Bank', 'Cash'], true)) {
+        $wasBankOrCash = true;
+    }
+
+    $isNowBankOrCash = in_array($newGroup['name'], ['Bank', 'Cash'], true);
+
+    $pdo->beginTransaction();
 
     $stmt = $pdo->prepare("
         UPDATE accounts
@@ -146,16 +158,67 @@ try {
     ");
     $stmt->execute([$name, $accountGroupId, $newCode, $id]);
 
+    // Existing bank_accounts row for this ledger account, if any
+    $bankRowStmt = $pdo->prepare("
+        SELECT id
+        FROM bank_accounts
+        WHERE account_id = ? AND is_active = TRUE
+    ");
+    $bankRowStmt->execute([$id]);
+    $bankRow = $bankRowStmt->fetch();
+
+    if ($isNowBankOrCash) {
+        $accountType = $newGroup['name'] === 'Bank' ? 'BANK' : 'CASH';
+
+        if ($bankRow) {
+            $pdo->prepare("
+                UPDATE bank_accounts
+                SET name = ?, account_type = ?
+                WHERE id = ?
+            ")->execute([$name, $accountType, $bankRow['id']]);
+        } else {
+            $pdo->prepare("
+                INSERT INTO bank_accounts (account_id, name, account_type, opening_balance)
+                VALUES (?, ?, ?, 0)
+            ")->execute([$id, $name, $accountType]);
+        }
+    } elseif ($wasBankOrCash && $bankRow) {
+        // Moving OUT of Bank/Cash — block if this account is still in active use anywhere.
+        $ledgerUsage = $pdo->prepare("SELECT id FROM ledger_entries WHERE account_id = ? LIMIT 1");
+        $ledgerUsage->execute([$id]);
+
+        $bankUsage = $pdo->prepare("
+            SELECT id FROM transactions WHERE bank_account_id = ? AND status != 'VOID' LIMIT 1
+        ");
+        $bankUsage->execute([$bankRow['id']]);
+
+        if ($ledgerUsage->fetch() || $bankUsage->fetch()) {
+            $pdo->rollBack();
+            http_response_code(409);
+            echo json_encode([
+                "success" => false,
+                "message" => "This account has existing transactions and cannot be moved out of the Bank/Cash group."
+            ]);
+            exit();
+        }
+
+        $pdo->prepare("UPDATE bank_accounts SET is_active = FALSE WHERE id = ?")->execute([$bankRow['id']]);
+    }
+
+    $pdo->commit();
+
     http_response_code(200);
     echo json_encode([
         "success" => true,
         "message" => "Account updated successfully."
     ]);
+
 } catch (PDOException $e) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
     error_log("Update account error: " . $e->getMessage());
     http_response_code(500);
     echo json_encode([
         "success" => false,
-        "message" => "Failed to update ledger."
+        "message" => "Failed to update account."
     ]);
 }

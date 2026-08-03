@@ -31,21 +31,12 @@ if (!$data) {
 
 $name = trim($data['name'] ?? '');
 $accountGroupId = $data['account_group_id'] ?? null;
-$openingBalance = $data['opening_balance'] ?? 0;
-$openingBalanceType = $data['opening_balance_type'] ?? null;
-$openingDate = $data['opening_date'] ?? null;
 
 // Validation
 $errors = [];
 
 if ($name === '') $errors[] = "Account name is required.";
 if (!$accountGroupId) $errors[] = "Account group is required.";
-if ($openingBalance > 0 && !in_array($openingBalanceType, ['DEBIT', 'CREDIT'], true)) {
-    $errors[] = "Opening balance type must be DEBIT or CREDIT when an opening balance is set.";
-}
-if ($openingBalance > 0 && !$openingDate) {
-    $errors[] = "Opening date is required when an opening balance is set.";
-}
 
 if ($errors) {
     http_response_code(400);
@@ -59,7 +50,7 @@ if ($errors) {
 try {
     // Confirm the account group actually exists
     $groupCheck = $pdo->prepare("
-        SELECT id, code
+        SELECT id, name, code
         FROM account_groups
         WHERE id = ?
     ");
@@ -74,6 +65,8 @@ try {
         ]);
         exit();
     }
+
+    $isBankOrCashGroup = in_array($group['name'], ['Bank', 'Cash'], true);
 
     $accountCode = generateAccountCode($pdo, $group['id'], $group['code']);
 
@@ -93,88 +86,51 @@ try {
         exit();
     }
 
+    $pdo->beginTransaction();
+
     $stmt = $pdo->prepare("
         INSERT INTO accounts (
             account_group_id,
             name,
             code,
-            opening_balance,
-            opening_balance_type,
-            opening_date,
             is_system
         )
-        VALUES (?, ?, ?, ?, ?, ?, FALSE)
+        VALUES (?, ?, ?, FALSE)
     ");
     $stmt->execute([
         $accountGroupId,
         $name,
-        $accountCode,
-        $openingBalance,
-        $openingBalanceType,
-        $openingDate
+        $accountCode
     ]);
     $newId = (int) $pdo->lastInsertId();
 
-    // If an opening balance was given, post the offsetting entry to "Opening Balance" equity account
-    if ($openingBalance > 0) {
-        $obAccount = $pdo->query("
-            SELECT id
-            FROM accounts
-            WHERE name = 'Opening Balance'
-            LIMIT 1
-        ")->fetch();
+    if ($isBankOrCashGroup) {
+        $accountType = $group['name'] === 'Bank' ? 'BANK' : 'CASH';
 
-        if ($obAccount) {
-            // Insert a JOURNAL transaction representing the opening balance
-            $txStmt = $pdo->prepare("
-                INSERT INTO transactions (
-                    type,
-                    date,
-                    ref_number,
-                    total_amount,
-                    notes,
-                    created_by
-                )
-                VALUES ('JOURNAL', ?, ?, ?, ?, ?)
-            ");
-            $refNumber = 'OB-' . $newId . '-' . time();
-            $txStmt->execute([
-                $openingDate,
-                $refNumber,
-                $openingBalance,
-                "Opening balance for account: $name",
-                $_SESSION['user_id'],
-            ]);
-            $txId = (int) $pdo->lastInsertId();
-
-            $accountStmt = $pdo->prepare("
-                INSERT INTO account_entries (
-                    transaction_id,
-                    account_id,
-                    debit, credit,
-                    date,
-                    narration
-                )
-                VALUES (?, ?, ?, ?, ?, ?)
-            ");
-
-            if ($openingBalanceType === 'DEBIT') {
-                $accountStmt->execute([$txId, $newId, $openingBalance, 0, $openingDate, "Opening balance"]);
-                $accountStmt->execute([$txId, $obAccount['id'], 0, $openingBalance, $openingDate, "Opening balance offset"]);
-            } else {
-                $accountStmt->execute([$txId, $newId, 0, $openingBalance, $openingDate, "Opening balance"]);
-                $accountStmt->execute([$txId, $obAccount['id'], $openingBalance, 0, $openingDate, "Opening balance offset"]);
-            }
-        }
+        $bankStmt = $pdo->prepare("
+            INSERT INTO bank_accounts (account_id, name, account_type, opening_balance)
+            VALUES (?, ?, ?, 0)
+        ");
+        $bankStmt->execute([
+            $newId,
+            $name,
+            $accountType
+        ]);
     }
+
+    $pdo->commit();
 
     http_response_code(201);
     echo json_encode([
         "success" => true,
         "message" => "Account created successfully.",
-        "data" => ["id" => $newId]
+        "data" => [
+            "id" => $newId,
+            "code" => $accountCode
+        ]
     ]);
 } catch (PDOException $e) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
     error_log("Create account error: " . $e->getMessage());
     http_response_code(500);
     echo json_encode([

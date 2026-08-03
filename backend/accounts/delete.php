@@ -42,12 +42,13 @@ if ($id <= 0) {
 try {
     // Check account exists
     $existing = $pdo->prepare("
-        SELECT id
+        SELECT id, name, is_system
         FROM accounts
         WHERE id = ? AND is_active = TRUE
     ");
     $existing->execute([$id]);
-    if (!$existing->fetch()) {
+    $account = $existing->fetch();
+    if (!$account) {
         http_response_code(404);
         echo json_encode([
             "success" => false,
@@ -57,29 +58,56 @@ try {
     }
 
     // Block delete if the contact has any transactions
-    // $usageCheck = $pdo->prepare("
-    //     SELECT id
-    //     FROM transactions
-    //     WHERE contact_id = ?
-    //     LIMIT 1
-    // ");
-    // $usageCheck->execute([$id]);
-    // if ($usageCheck->fetch()) {
-    //     http_response_code(409);
-    //     echo json_encode([
-    //         "success" => false,
-    //         "message" => "This contact has existing transactions and cannot be deleted."
-    //     ]);
-    //     exit();
-    // }
+    if ($account['is_system']) {
+        http_response_code(403);
+        echo json_encode(["success" => false, "message" => "This is a system ledger and cannot be deleted."]);
+        exit();
+    }
 
-    // Soft delete
-    $stmt = $pdo->prepare("
+    // Block delete if this account has any ledger activity at all
+    $usageCheck = $pdo->prepare("
+        SELECT le.id, t.status
+        FROM ledger_entries le
+        LEFT JOIN transactions t
+        ON le.transaction_id = t.id
+        WHERE le.account_id = ? AND t.status != 'VOID'
+        LIMIT 1
+    ");
+    $usageCheck->execute([$id]);
+    if ($usageCheck->fetch()) {
+        http_response_code(409);
+        echo json_encode([
+            "success" => false,
+            "message" => "This account has existing ledger entries and cannot be deleted."
+        ]);
+        exit();
+    }
+
+    $pdo->beginTransaction();
+
+    $pdo->prepare("
         UPDATE accounts
         SET is_active = FALSE
         WHERE id = ?
+    ")->execute([$id]);
+
+    // If this was a Bank/Cash account, deactivate its linked bank_accounts row too
+    $bankRowStmt = $pdo->prepare("
+        SELECT id
+        FROM bank_accounts
+        WHERE account_id = ? AND is_active = TRUE
     ");
-    $stmt->execute([$id]);
+    $bankRowStmt->execute([$id]);
+    $bankRow = $bankRowStmt->fetch();
+    if ($bankRow) {
+        $pdo->prepare("
+            UPDATE bank_accounts
+            SET is_active = FALSE
+            WHERE id = ?
+        ")->execute([$bankRow['id']]);
+    }
+
+    $pdo->commit();
 
     http_response_code(200);
     echo json_encode([
@@ -88,6 +116,7 @@ try {
     ]);
 
 } catch (PDOException $e) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
     error_log("Delete account error: " . $e->getMessage());
     http_response_code(500);
     echo json_encode([
