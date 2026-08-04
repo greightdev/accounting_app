@@ -7,6 +7,8 @@ import TransactionForm from "../../components/TransactionForm";
 import DataTable from "../../components/DataTable";
 import useToast from "../../hooks/useToast";
 import Toast from "../../components/Toast";
+import TransactionView from "../../components/TransactionView";
+import { adaptTransactionForView } from "../../ViewAdapters";
 
 const paymentStatusStyles = (paymentStatus) => {
     if (!paymentStatus) return "bg-slate-100 text-slate-500"; // draft
@@ -27,6 +29,8 @@ export default function Bills() {
     const [search, setSearch] = useState('');
     const [showForm, setShowForm] = useState(false);
     const { toast, showToast, hideToast } = useToast();
+
+    const [viewTx, setViewTx] = useState(null);
 
     useEffect(() => {
         fetchBills();
@@ -127,6 +131,15 @@ export default function Bills() {
         }
     };
 
+    const handleView = async (tx) => {
+        try {
+            const { data } = await api.get(`/transactions/get.php?id=${tx.id}`);
+            setViewTx(data.data);
+        } catch (err) {
+            showToast("Failed to load transaction.", "error");
+        }
+    };
+
     const baseColumns = [
         { key: "date", header: "Date", },
         { key: "ref_number", header: "#", },
@@ -152,6 +165,7 @@ export default function Bills() {
     const approvedActions = {
         key: "actions",
         header: "Action",
+        stopRowClick: true,
         render: (bill) => (
             <div className="flex items-center gap-2">
                 <button
@@ -167,6 +181,7 @@ export default function Bills() {
     const draftActions = {
         key: "actions",
         header: "Action",
+        stopRowClick: true,
         render: (bill) => (
             <button
                 onClick={() => handleEdit(bill)}
@@ -180,6 +195,7 @@ export default function Bills() {
     const approvalColumn = {
         key: "approve",
         header: "Approve / Reject",
+        stopRowClick: true,
         render: (bill) => (
             <div className="flex items-center gap-2">
                 <button
@@ -246,9 +262,16 @@ export default function Bills() {
                             data={filtered}
                             loading={loading}
                             emptyMessage="No bills found"
+                            onRowClick={handleView}
                         />
                     </div>
                 </>
+            )}
+            {viewTx && (
+                <TransactionView
+                    {...adaptTransactionForView(viewTx)}
+                    onClose={() => setViewTx(null)}
+                />
             )}
         </>
     );

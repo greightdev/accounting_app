@@ -7,6 +7,8 @@ import TransactionForm from "../../components/TransactionForm";
 import DataTable from "../../components/DataTable";
 import useToast from "../../hooks/useToast";
 import Toast from "../../components/Toast";
+import TransactionView from "../../components/TransactionView";
+import { adaptTransactionForView } from "../../ViewAdapters";
 
 const paymentStatusStyles = (paymentStatus) => {
     if (!paymentStatus) return "bg-slate-100 text-slate-500"; // draft
@@ -27,6 +29,8 @@ export default function Invoices() {
     const [search, setSearch] = useState('');
     const [showForm, setShowForm] = useState(false);
     const { toast, showToast, hideToast } = useToast();
+
+    const [viewTx, setViewTx] = useState(null);
 
     useEffect(() => {
         fetchInvoices();
@@ -128,6 +132,15 @@ export default function Invoices() {
         }
     };
 
+    const handleView = async (tx) => {
+        try {
+            const { data } = await api.get(`/transactions/get.php?id=${tx.id}`);
+            setViewTx(data.data);
+        } catch (err) {
+            showToast("Failed to load transaction.", "error");
+        }
+    };
+
     const baseColumns = [
         { key: "date", header: "Date", },
         { key: "ref_number", header: "#", },
@@ -153,6 +166,7 @@ export default function Invoices() {
     const approvedActions = {
         key: "actions",
         header: "Action",
+        stopRowClick: true,
         render: (invoice) => (
             <div className="flex items-center gap-2">
                 <button
@@ -168,6 +182,7 @@ export default function Invoices() {
     const draftActions = {
         key: "actions",
         header: "Action",
+        stopRowClick: true,
         render: (invoice) => (
             <button
                 onClick={() => handleEdit(invoice)}
@@ -181,6 +196,7 @@ export default function Invoices() {
     const approvalColumn = {
         key: "approve",
         header: "Approve / Reject",
+        stopRowClick: true,
         render: (invoice) => (
             <div className="flex items-center gap-2">
                 <button
@@ -247,9 +263,16 @@ export default function Invoices() {
                             data={filtered}
                             loading={loading}
                             emptyMessage="No invoices found"
+                            onRowClick={handleView}
                         />
                     </div>
                 </>
+            )}
+            {viewTx && (
+                <TransactionView
+                    {...adaptTransactionForView(viewTx)}
+                    onClose={() => setViewTx(null)}
+                />
             )}
         </>
     );

@@ -7,6 +7,8 @@ import SettlementForm from "../../components/SettlementForm";
 import DataTable from "../../components/DataTable";
 import useToast from "../../hooks/useToast";
 import Toast from "../../components/Toast";
+import TransactionView from "../../components/TransactionView";
+import { adaptTransactionForView } from "../../ViewAdapters";
 
 const statusStyles = (status) => status === "VOID" ? "bg-red-50 text-red-500" : "bg-emerald-50 text-emerald-600";
 
@@ -29,6 +31,8 @@ export default function Payments() {
     const [showForm, setShowForm] = useState(false);
     const [showVoided, setShowVoided] = useState(false);
     const { toast, showToast, hideToast } = useToast();
+
+    const [viewTx, setViewTx] = useState(null);
 
     useEffect(() => {
         fetchPayments();
@@ -114,6 +118,15 @@ export default function Payments() {
         }
     };
 
+    const handleView = async (tx) => {
+        try {
+            const { data } = await api.get(`/transactions/get.php?id=${tx.id}`);
+            setViewTx(data.data);
+        } catch (err) {
+            showToast("Failed to load transaction.", "error");
+        }
+    };
+
     const columns = [
         { key: "date", header: "Date", },
         { key: "ref_number", header: "#", },
@@ -131,7 +144,7 @@ export default function Payments() {
             ),
         },
         {
-            key: "actions", header: "Action", render: (payment) => (
+            key: "actions", header: "Action", stopRowClick: true, render: (payment) => (
                 <div className="flex items-center gap-2">
                     {payment.status !== "VOID" && (
                         <button
@@ -179,9 +192,16 @@ export default function Payments() {
                             data={filtered}
                             loading={loading}
                             emptyMessage="No payments found"
+                            onRowClick={handleView}
                         />
                     </div>
                 </>
+            )}
+            {viewTx && (
+                <TransactionView
+                    {...adaptTransactionForView(viewTx)}
+                    onClose={() => setViewTx(null)}
+                />
             )}
         </>
     );

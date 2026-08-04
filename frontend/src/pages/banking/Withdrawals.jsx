@@ -7,6 +7,8 @@ import BankTransferForm from "../../components/BankTransferForm";
 import DataTable from "../../components/DataTable";
 import useToast from "../../hooks/useToast";
 import Toast from "../../components/Toast";
+import TransactionView from "../../components/TransactionView";
+import { adaptTransactionForView } from "../../ViewAdapters";
 
 export default function Withdrawals() {
     const [transactions, setTransactions] = useState([]);
@@ -18,6 +20,8 @@ export default function Withdrawals() {
     const [search, setSearch] = useState('');
     const [showForm, setShowForm] = useState(false);
     const { toast, showToast, hideToast } = useToast();
+
+    const [viewTx, setViewTx] = useState(null);
 
     useEffect(() => {
         fetchTransactions();
@@ -131,6 +135,15 @@ export default function Withdrawals() {
         }
     };
 
+    const handleView = async (tx) => {
+        try {
+            const { data } = await api.get(`/transactions/get.php?id=${tx.id}`);
+            setViewTx(data.data);
+        } catch (err) {
+            showToast("Failed to load transaction.", "error");
+        }
+    };
+
     const baseColumns = [
         { key: "date", header: "Date", },
         { key: "ref_number", header: "#", },
@@ -146,6 +159,7 @@ export default function Withdrawals() {
     const approvedActions = {
         key: "actions",
         header: "Action",
+        stopRowClick: true,
         render: (tx) => (
             <div className="flex items-center gap-2">
                 <button
@@ -161,6 +175,7 @@ export default function Withdrawals() {
     const draftActions = {
         key: "actions",
         header: "Action",
+        stopRowClick: true,
         render: (tx) => (
             <button
                 onClick={() => handleEdit(tx)}
@@ -174,6 +189,7 @@ export default function Withdrawals() {
     const approvalColumn = {
         key: "approve",
         header: "Approve / Reject",
+        stopRowClick: true,
         render: (tx) => (
             <div className="flex items-center gap-2">
                 <button
@@ -235,9 +251,16 @@ export default function Withdrawals() {
                             data={filtered}
                             loading={loading}
                             emptyMessage="No withdrawals found"
+                            onRowClick={handleView}
                         />
                     </div>
                 </>
+            )}
+            {viewTx && (
+                <TransactionView
+                    {...adaptTransactionForView(viewTx)}
+                    onClose={() => setViewTx(null)}
+                />
             )}
         </>
     );
