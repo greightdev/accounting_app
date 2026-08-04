@@ -32,7 +32,7 @@ export default function Modal({
                     </div>
                 )}
 
-                <form onSubmit={onsubmit} className="space-y-4">
+                <form onSubmit={onSubmit} className="space-y-4">
                     {children}
                     
                     <div className="flex gap-3 pt-4">
