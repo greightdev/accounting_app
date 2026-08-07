@@ -33,7 +33,6 @@ try {
             te.is_paid,
             c.id AS contact_id,
             c.name AS customer_name,
-            t.ref_number
             t.ref_number,
             pt.ref_number AS paid_via_ref
         FROM tds_entries te

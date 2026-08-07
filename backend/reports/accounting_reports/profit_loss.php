@@ -20,6 +20,17 @@ $dateTo = $_GET['date_to'] ?? null;
 
 try {
     // Fetch all Income and Expense accounts with their net balances
+    $subSql = "
+        SELECT le.account_id, le.debit, le.credit
+        FROM ledger_entries le
+        JOIN transactions t ON t.id = le.transaction_id
+        WHERE t.status = 'APPROVED'
+    ";
+    $params = [];
+
+    if ($dateFrom) { $subSql .= " AND le.date >= ?"; $params[] = $dateFrom; }
+    if ($dateTo) { $subSql .= " AND le.date <= ?"; $params[] = $dateTo; }
+
     $sql = "
         SELECT
             a.id,
@@ -31,15 +42,7 @@ try {
             COALESCE(SUM(le.credit), 0) AS total_credit
         FROM accounts a
         JOIN account_groups ag ON ag.id = a.account_group_id
-        LEFT JOIN ledger_entries le ON le.account_id = a.id
-    ";
-    $params = [];
-
-    if ($dateFrom) { $sql .= " AND le.date >= ?"; $params[] = $dateFrom; }
-    if ($dateTo) { $sql .= " AND le.date <= ?"; $params[] = $dateTo; }
-
-    $sql .= "
-        LEFT JOIN transactions t ON t.id = le.transaction_id AND t.status = 'APPROVED'
+        LEFT JOIN ($subSql) le ON le.account_id = a.id
         WHERE a.is_active = TRUE AND ag.type IN ('Income', 'Expense')
         GROUP BY a.id, a.name, a.code, ag.type, ag.name
         ORDER BY ag.type DESC, a.code

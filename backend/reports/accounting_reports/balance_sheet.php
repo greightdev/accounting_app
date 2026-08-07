@@ -30,8 +30,12 @@ try {
             COALESCE(SUM(le.credit), 0) AS total_credit
         FROM accounts a
         JOIN account_groups ag ON ag.id = a.account_group_id
-        LEFT JOIN ledger_entries le ON le.account_id = a.id
-        LEFT JOIN transactions t ON t.id = le.transaction_id AND t.status = 'APPROVED' AND le.date <= ?
+        LEFT JOIN (
+            SELECT le.account_id, le.debit, le.credit
+            FROM ledger_entries le
+            JOIN transactions t ON t.id = le.transaction_id
+            WHERE t.status = 'APPROVED' AND le.date <= ?
+        ) le ON le.account_id = a.id
         WHERE a.is_active = TRUE AND ag.type IN ('Asset', 'Liability', 'Equity')
         GROUP BY a.id, a.name, a.code, ag.type, ag.name
         ORDER BY ag.type, a.code
@@ -46,10 +50,12 @@ try {
             COALESCE(SUM(le.credit), 0) AS total_credit
         FROM accounts a
         JOIN account_groups ag ON ag.id = a.account_group_id
-        LEFT JOIN ledger_entries le ON le.account_id = a.id
-        LEFT JOIN transactions t ON t.id = le.transaction_id
-            AND t.status = 'APPROVED'
-            AND le.date <= ?
+        LEFT JOIN (
+            SELECT le.account_id, le.debit, le.credit
+            FROM ledger_entries le
+            JOIN transactions t ON t.id = le.transaction_id
+            WHERE t.status = 'APPROVED' AND le.date <= ?
+        ) le ON le.account_id = a.id
         WHERE a.is_active = TRUE AND ag.type IN ('Income', 'Expense')
         GROUP BY ag.type
     ");

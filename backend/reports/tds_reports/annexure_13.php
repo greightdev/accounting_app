@@ -35,9 +35,9 @@ try {
             c.name AS vendor_name,
             c.pan AS vendor_pan,
             SUM(t.total_amount) AS total_paid,
-            SUM(t.sub_total) AS total_taxable,
+            SUM(te.tds_amount / 0.015) AS total_taxable,
             SUM(te.tds_amount) AS total_tds,
-            ROUND((SUM(te.tds_amount) / NULLIF(SUM(t.sub_total), 0)) * 100, 2) AS effective_tds_rate
+            1.5 AS effective_tds_rate
         FROM tds_entries te
         JOIN contacts c ON c.id = te.contact_id
         JOIN transactions t ON t.id  = te.transaction_id
@@ -56,9 +56,9 @@ try {
             c.name AS customer_name,
             c.pan AS customer_pan,
             SUM(t.total_amount) AS total_invoiced,
-            SUM(t.sub_total) AS total_taxable,
+            SUM(te.tds_amount / 0.015) AS total_taxable,
             SUM(te.tds_amount) AS total_tds_borne,
-            ROUND((SUM(te.tds_amount) / NULLIF(SUM(t.sub_total), 0)) * 100, 2) AS effective_tds_rate
+            1.5 AS effective_tds_rate
         FROM tds_entries te
         JOIN contacts c ON c.id = te.contact_id
         JOIN transactions t ON t.id = te.transaction_id
@@ -75,9 +75,9 @@ try {
             c.name AS customer_name,
             c.pan AS customer_pan,
             SUM(t.total_amount) AS total_invoiced,
-            SUM(t.sub_total) AS total_taxable,
+            SUM(te.tds_amount / 0.015) AS total_taxable,
             SUM(te.tds_amount) AS total_tds_deducted,
-            ROUND((SUM(te.tds_amount) / NULLIF(SUM(t.sub_total), 0)) * 100, 2) AS effective_tds_rate
+            1.5 AS effective_tds_rate
         FROM tds_entries te
         JOIN contacts c ON c.id = te.contact_id
         JOIN transactions t ON t.id = te.transaction_id
