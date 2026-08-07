@@ -34,7 +34,7 @@ $date = $data['date'] ?? '';
 $bankAccountId = $data['bank_account_id'] ?? null;
 $amountReceived = (float)($data['amount_received'] ?? 0);
 $tdsDeducted = (bool)($data['tds_deducted'] ?? false);
-$tdsAmount = (float)$data['tds_amount'] ?? 0;
+// $tdsAmount = (float)$data['tds_amount'] ?? 0;
 $fiscalYear = $data['fiscal_year'] ?? '';
 $notes = trim($data['notes'] ?? '');
 
@@ -46,7 +46,8 @@ if (empty($date)) $errors[] = "Date is required.";
 if (!$bankAccountId) $errors[] = "Bank / Cash account is required.";
 if ($amountReceived <= 0) $errors[] = "Amount must be greater than zero.";
 if ($tdsDeducted) {
-    if ($tdsAmount <= 0) $errors[] = "TDS amount is required when customer deducts TDS.";
+    // if ($tdsAmount <= 0) $errors[] = "TDS amount is required when customer deducts TDS.";
+    if (!$invoiceId) $errors[] = "TDS can only be applied against a specific invoice.";
     if (empty($fiscalYear)) $errors[] = "Fiscal year is required for TDS entries.";
 }
 
@@ -62,7 +63,7 @@ if ($errors) {
 try {
     // Validate customer
     $contactStmt = $pdo->prepare("
-        SELECT id, name, pan
+        SELECT id, name, pan, tds_deducted
         FROM contacts
         WHERE id = ? AND type = 'Customer' AND is_active = TRUE
     ");
@@ -98,7 +99,7 @@ try {
 
     // Fetch system ledger accounts
     $getAccount = function($name) use ($pdo) {
-        $stmt = $pdo-> prepare("
+        $stmt = $pdo->prepare("
             SELECT id
             FROM accounts
             WHERE name = ? AND is_active = TRUE
@@ -112,6 +113,7 @@ try {
     $receivableId = $getAccount('Customer Receivable');
     $tdsReceivableId = $getAccount('TDS Receivable');
     $tdsExpenseId = $getAccount('TDS Expense');
+    $tdsPayableId = $getAccount('TDS Payable');
 
     if (!$receivableId) {
         http_response_code(500);
@@ -122,11 +124,12 @@ try {
         exit();
     }
 
-    // Validate invoice if provided
+    // Validate invoice if provided, and pull sub_total so we can compute TDS ourselves
+    $invoice = null;
+    $alreadyAllocated = 0.0;
     if ($invoiceId) {
-        // Validate invoice belongs to this customer
         $invCheck = $pdo->prepare("
-            SELECT id, total_amount
+            SELECT id, total_amount, sub_total
             FROM transactions
             WHERE id = ? AND contact_id = ? AND type = 'SALES' AND status = 'APPROVED'
         ");
@@ -141,10 +144,40 @@ try {
             ]);
             exit();
         }
+
+        $allocStmt = $pdo->prepare("
+            SELECT COALESCE(SUM(allocated_amount), 0) AS total
+            FROM transaction_allocations
+            WHERE settled_transaction_id = ?
+        ");
+        $allocStmt->execute([$invoiceId]);
+        $alreadyAllocated = (float)$allocStmt->fetch()['total'];
+    }
+
+    $tdsAmount = 0.0;
+    if ($tdsDeducted) {
+        if (!$contact['tds_deducted']) {
+            http_response_code(422);
+            echo json_encode([
+                "success" => false,
+                "message" => "This customer is not flagged to deduct TDS."
+            ]);
+            exit();
+        }
+        if ($alreadyAllocated > 0.009) {
+            http_response_code(422);
+            echo json_encode([
+                "success" => false,
+                "message" => "TDS only applies on the first settlement of an invoice; this invoice already has settlements against it."
+            ]);
+            exit();
+        }
+        $tdsAmount = round(((float)$invoice['sub_total']) * 0.015, 2);
     }
 
     // Total receivable cleared = cash received + TDS deducted by customer
-    $totalCleared = $amountReceived + ($tdsDeducted ? $tdsAmount : 0);
+    // $totalCleared = $amountReceived + ($tdsDeducted ? $tdsAmount : 0);
+    $totalCleared = round($amountReceived + $tdsAmount, 2);
 
     // Auto-generate ref number
     $countStmt = $pdo->query("
@@ -204,21 +237,17 @@ try {
         // Scenario A: Customer deducted TDS - they paid less cash, rest is TDS credit
         // Bank Dr (cash actually received)
         $ledgerStmt->execute([$txId, $bank['ledger_account_id'], $amountReceived, 0, $date, $narration]);
-        // TDS Receivable Dr (TDS they deducted - we can clain this from govt)
+        // TDS Receivable Dr (TDS they deducted - we can claim this from govt)
         $ledgerStmt->execute([$txId, $tdsReceivableId, $tdsAmount, 0, $date, $narration]);
         // Customer Receivable Cr (full invoice amount cleared)
         $ledgerStmt->execute([$txId, $receivableId, 0, $totalCleared, $date, $narration]);
 
     } else {
-        // Scenario B: Customer did not deduct TDS - we received full amount, but we still owe TDS to the government (TDS Expense on our side)
+        // Scenario B: no TDS on this receipt at all — plain cash/bank receipt
         // Bank Dr (full amount received)
         $ledgerStmt->execute([$txId, $bank['ledger_account_id'], $amountReceived, 0, $date, $narration]);
         // Customer Receivable Cr (full amount cleared)
         $ledgerStmt->execute([$txId, $receivableId, 0, $amountReceived, $date, $narration]);
-
-        if ($tdsAmount > 0 && $tdsExpenseId) {
-            $ledgerStmt->execute([$txId,$tdsExpenseId, $tdsAmount, 0, $date, "TDS Expense On {$narration}"]);
-        }
     }
 
     // Insert TDS entry for reporting / Annexure 13
@@ -233,29 +262,19 @@ try {
                 fiscal_year,
                 date
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, 'RECEIVABLE', ?, ?)
         ");
-        $tdsType = $tdsDeducted ? 'RECEIVABLE' : 'EXPENSE';
         $tdsStmt->execute([
             $txId,
             $contactId,
             $contact['pan'],
             $tdsAmount,
-            $tdsType,
             $fiscalYear,
             $date
         ]);
     }
 
     if ($invoiceId) {
-        // How much has already been allocated to this invoice from other receipts
-        $allocStmt = $pdo->prepare("
-            SELECT COALESCE(SUM(allocated_amount), 0) AS total
-            FROM transaction_allocations
-            WHERE settled_transaction_id = ?");
-        $allocStmt->execute([$invoiceId]);
-        $alreadyAllocated = (float)$allocStmt->fetch()['total'];
- 
         $invoiceTotal = (float)$invoice['total_amount'];
         $remaining = $invoiceTotal - $alreadyAllocated; // how much is still unpaid on this invoice
         $toAllocate = min($totalCleared, $remaining);   // never allocate more than what's due
@@ -281,7 +300,8 @@ try {
         "data" => [
             "id" => $txId,
             "ref_number" => $refNumber,
-            "total_cleared" => $totalCleared
+            "total_cleared" => $totalCleared,
+            "tds_amount" => $tdsAmount
         ]
     ]);
 } catch (PDOException $e) {

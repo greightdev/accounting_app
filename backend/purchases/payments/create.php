@@ -34,7 +34,7 @@ $date = $data['date'] ?? '';
 $bankAccountId = $data['bank_account_id'] ?? null;
 $amountPaid = (float)($data['amount_paid'] ?? 0);
 $tdsDeducted = (bool)($data['tds_deducted'] ?? false);
-$tdsAmount = (float)$data['tds_amount'] ?? 0;
+// $tdsAmount = (float)$data['tds_amount'] ?? 0;
 $fiscalYear = $data['fiscal_year'] ?? '';
 $notes = trim($data['notes'] ?? '');
 
@@ -46,7 +46,8 @@ if (empty($date)) $errors[] = "Date is required.";
 if (!$bankAccountId) $errors[] = "Bank / Cash account is required.";
 if ($amountPaid <= 0) $errors[] = "Amount must be greater than zero.";
 if ($tdsDeducted) {
-    if ($tdsAmount <= 0) $errors[] = "TDS amount is required when deducting TDS from vendor.";
+    // if ($tdsAmount <= 0) $errors[] = "TDS amount is required when deducting TDS from vendor.";
+    if (!$billId) $errors[] = "TDS can only be applied against a specific bill.";
     if (empty($fiscalYear)) $errors[] = "Fiscal year is required for TDS entries.";
 }
 
@@ -62,7 +63,7 @@ if ($errors) {
 try {
     // Validate vendor
     $contactStmt = $pdo->prepare("
-        SELECT id, name, pan
+        SELECT id, name, pan, tds_deducted
         FROM contacts
         WHERE id = ? AND type = 'Vendor' AND is_active = TRUE
     ");
@@ -98,7 +99,7 @@ try {
 
     // Fetch system ledger accounts
     $getAccount = function($name) use ($pdo) {
-        $stmt = $pdo-> prepare("
+        $stmt = $pdo->prepare("
             SELECT id
             FROM accounts
             WHERE name = ? AND is_active = TRUE
@@ -130,11 +131,12 @@ try {
         exit();
     }
 
-    // Validate bill if provided
+    // Validate bill if provided, and pull sub_total so we can compute TDS ourselves
+    $bill = null;
+    $alreadyAllocated = 0.0;
     if ($billId) {
-        // Validate bill belongs to this vendor
         $billCheck = $pdo->prepare("
-            SELECT id
+            SELECT id, total_amount, sub_total
             FROM transactions
             WHERE id = ? AND contact_id = ? AND type = 'PURCHASE' AND status = 'APPROVED'
         ");
@@ -149,10 +151,39 @@ try {
             ]);
             exit();
         }
+
+        $allocStmt = $pdo->prepare("
+            SELECT COALESCE(SUM(allocated_amount), 0) AS total
+            FROM transaction_allocations
+            WHERE settled_transaction_id = ?
+        ");
+        $allocStmt->execute([$billId]);
+        $alreadyAllocated = (float)$allocStmt->fetch()['total'];
+    }
+
+    $tdsAmount = 0.0;
+    if ($tdsDeducted) {
+        if (!$contact['tds_deducted']) {
+            http_response_code(422);
+            echo json_encode([
+                "success" => false,
+                "message" => "This vendor is not flagged as TDS deductible."
+            ]);
+            exit();
+        }
+        if ($alreadyAllocated > 0.009) {
+            http_response_code(422);
+            echo json_encode([
+                "success" => false,
+                "message" => "TDS only applies on the first settlement of a bill; this bill already has settlements against it."
+            ]);
+            exit();
+        }
+        $tdsAmount = round(((float)$bill['sub_total']) * 0.015, 2);
     }
 
     // Total payable cleared = cash paid + TDS we deducted
-    $totalCleared = $amountPaid + ($tdsDeducted ? $tdsAmount : 0);
+    $totalCleared = round($amountPaid + $tdsAmount, 2);
 
     // Auto-generate ref number
     $countStmt = $pdo->query("
@@ -215,9 +246,7 @@ try {
         // Bank Cr (only what we actually paid out)
         $ledgerStmt->execute([$txId, $bank['ledger_account_id'], 0, $amountPaid, $date, $narration]);
         // TDS Payable Cr (TDS we owe to government)
-        if ($tdsPayableId) {
-            $ledgerStmt->execute([$txId, $tdsPayableId, 0, $tdsAmount, $date, $narration]);
-        }
+        $ledgerStmt->execute([$txId, $tdsPayableId, 0, $tdsAmount, $date, $narration]);
     } else {
         // Scenario B: No TDS deducted — pay vendor the full amount
         // Vendor Payable Dr
@@ -251,14 +280,6 @@ try {
     }
 
     if ($billId && $bill) {
-        $allocStmt = $pdo->prepare("
-            SELECT COALESCE(SUM(allocated_amount), 0) AS total
-            FROM transaction_allocations
-            WHERE settled_transaction_id = ?
-        ");
-        $allocStmt->execute([$billId]);
-        $alreadyAllocated = (float)$allocStmt->fetch()['total'];
- 
         $billTotal = (float)$bill['total_amount'];
         $remaining = $billTotal - $alreadyAllocated; // how much is still unpaid on this bill
         $toAllocate = min($totalCleared, $remaining); // never allocate more than what's due
@@ -283,7 +304,8 @@ try {
         "message" => "Payment recorded successfully.",
         "data" => [
             "id" => $txId,
-            "ref_number" => $refNumber
+            "ref_number" => $refNumber,
+            "tds_amount" => $tdsAmount
         ]
     ]);
 } catch (PDOException $e) {
