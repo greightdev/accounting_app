@@ -41,13 +41,33 @@ $validTaxTypes = ['VAT13', 'Exempt'];
 // Validation
 $errors = [];
 
-if ($id <= 0) $errors[] = 'A valid item ID is required';
-if ($name === '') $errors[] = "Item name is required.";
-if ($unit === '') $errors[] = "Item unit is required.";
-if ($hsnSacCode === '') $errors[] = "HSN/SAC code is required.";
+if ($name === '') {
+    $errors[] = "Item name is required.";
+} elseif (strlen($name) > 150) {
+    $errors[] = "Item name must be 150 characters or fewer.";
+} elseif (!preg_match("/^[A-Za-z0-9\s.,'&()\/-]+$/", $name)) {
+    $errors[] = "Item name can only contain letters, numbers, spaces, and . , ' & ( ) / -";
+}
+
+if ($unit === '') {
+    $errors[] = "Item unit is required.";
+} elseif (strlen($unit) > 30) {
+    $errors[] = "Unit must be 30 characters or fewer.";
+} elseif (!preg_match("/^[A-Za-z\s.\/-]+$/", $unit)) {
+    $errors[] = "Unit can only contain letters, spaces, and . / -";
+}
+
+if ($hsnSacCode === '') {
+    $errors[] = "HSN/SAC code is required.";
+} elseif (!preg_match('/^\d{2,20}$/', $hsnSacCode)) {
+    $errors[] = "HSN/SAC code must be 2 to 20 digits, numbers only.";
+}
+
 if (!in_array($taxType, $validTaxTypes, true)) $errors[] = "Tax type must be VAT13 or Exempt.";
-if ((float)$sellingPrice < 0) $errors[] = "Selling price cannot be negative.";
-if ((float)$purchaseRate < 0) $errors[] = "Purchase rate cannot be negative.";
+if (!is_numeric($sellingPrice)) $errors[] = "Selling price must be a valid number.";
+if (!is_numeric($purchaseRate)) $errors[] = "Purchase rate must be a valid number.";
+if (is_numeric($sellingPrice) && (float)$sellingPrice < 0) $errors[] = "Selling price cannot be negative.";
+if (is_numeric($purchaseRate) && (float)$purchaseRate < 0) $errors[] = "Purchase rate cannot be negative.";
 
 if ($errors) {
     http_response_code(400);
