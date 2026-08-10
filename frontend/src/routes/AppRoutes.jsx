@@ -15,6 +15,7 @@ import Withdrawals from "../pages/banking/Withdrawals";
 import Journal from "../pages/Journal";
 import ChartofAccounts from "../pages/ChartofAccounts";
 import AccountReports from "../pages/AccountReports";
+import ReportViewer from "../pages/ReportViewer";
 import Settings from "../pages/Settings";
 
 export default function AppRoutes() {
@@ -23,22 +24,23 @@ export default function AppRoutes() {
       <Routes>
         <Route path="/" element={<Login />} />
 
-        <Route element={<DashboardLayout />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/contacts" element={<Contacts />} />
-          <Route path="/items" element={<Items />} />
-          <Route path="/transactions" element={<Transactions />} />
-          <Route path="/sales/invoices" element={<Invoices />} />
-          <Route path="/sales/receipts" element={<Receipts />} />
-          <Route path="/purchases/bills" element={<Bills />} />
-          <Route path="/purchases/payments" element={<Payments />} />
-          <Route path="/banking/deposits" element={<Deposits />} />
-          <Route path="/banking/withdrawals" element={<Withdrawals />} />
-          <Route path="/journal" element={<Journal />} />
-          <Route path="/chartofaccounts" element={<ChartofAccounts />} />
-          <Route path="/reports" element={<AccountReports />} />
-          <Route path="/settings" element={<Settings />} />
-        </Route>
+          <Route element={<DashboardLayout />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/contacts" element={<Contacts />} />
+            <Route path="/items" element={<Items />} />
+            <Route path="/transactions" element={<Transactions />} />
+            <Route path="/sales/invoices" element={<Invoices />} />
+            <Route path="/sales/receipts" element={<Receipts />} />
+            <Route path="/purchases/bills" element={<Bills />} />
+            <Route path="/purchases/payments" element={<Payments />} />
+            <Route path="/banking/deposits" element={<Deposits />} />
+            <Route path="/banking/withdrawals" element={<Withdrawals />} />
+            <Route path="/journal" element={<Journal />} />
+            <Route path="/chartofaccounts" element={<ChartofAccounts />} />
+            <Route path="/reports" element={<AccountReports />} />
+            <Route path="/reports/:reportKey" element={<ReportViewer />} />
+            <Route path="/settings" element={<Settings />} />
+          </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
