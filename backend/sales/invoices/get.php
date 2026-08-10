@@ -4,7 +4,7 @@ require_once '../../server.php';
 require_once '../../db.php';
 require_once '../../includes/auth.php';
 
-requireRole(['admin', 'accountant']);
+requireRole(['admin', 'accountant', 'user']);
 
 // Only accept GET
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {

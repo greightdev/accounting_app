@@ -4,7 +4,7 @@ require_once '../../server.php';
 require_once '../../db.php';
 require_once '../../includes/auth.php';
 
-requireRole(['admin', 'accountant']);
+requireRole(['admin', 'accountant', 'user']);
 
 // Only accept POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -34,6 +34,10 @@ $dueDate = $data['due_date'] ?? '';
 $notes = trim($data['notes'] ?? '');
 $status = $data['status'] ?? 'DRAFT';
 $lineItems = $data['line_items'] ?? [];
+
+if ($_SESSION['role'] !== 'admin') {
+    $status = 'DRAFT';
+}
 
 $validStatuses = ['DRAFT', 'APPROVED'];
 
