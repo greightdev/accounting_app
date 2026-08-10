@@ -7,6 +7,9 @@ import DataTable from "../components/DataTable";
 import Modal from "../components/Modal";
 import Toast from "../components/Toast";
 import useToast from "../hooks/useToast";
+import { validateName, validatePan, validateNepaliPhone, validateEmail, filterNameInput, filterDigitsOnly } from "../utils/validators";
+import { useAuth } from "../context/AuthContext";
+import { can } from "../permissions";
 
 const DEFAULT_TABS = [
     { key: 'All', label: 'All' },
@@ -26,6 +29,8 @@ const emptyForm = {
 }
 
 export default function Contacts() {
+    const { role } = useAuth();
+    const canDelete = can(role, "canDelete");
     const [contacts, setContacts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -33,9 +38,10 @@ export default function Contacts() {
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingContact, setEditingContact] = useState(null);
-    const [form, setForm] = useState(emptyForm)
-    const [modalError, setModalError] = useState('')
-    const [submitting, setSubmitting] = useState(false)
+    const [form, setForm] = useState(emptyForm);
+    const [fieldErrors, setFieldErrors] = useState({});
+    const [modalError, setModalError] = useState('');
+    const [submitting, setSubmitting] = useState(false);
     const { toast, showToast, hideToast } = useToast();
 
     useEffect(() => {
@@ -58,6 +64,7 @@ export default function Contacts() {
         setEditingContact(null);
         setForm(emptyForm);
         setModalError('');
+        setFieldErrors({});
         setIsModalOpen(true);
     };
 
@@ -83,6 +90,7 @@ export default function Contacts() {
             tds_deducted: contact.tds_deducted,
         });
         setModalError('');
+        setFieldErrors({});
         setIsModalOpen(true);
     };
 
@@ -91,20 +99,55 @@ export default function Contacts() {
         setEditingContact(null);
         setForm(emptyForm);
         setModalError('');
+        setFieldErrors({});
     };
 
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
+
+        let nextValue = value;
+        if (type === 'checkbox') {
+            nextValue = checked;
+        } else if (name === 'name') {
+            nextValue = filterNameInput(value);
+        } else if (name === 'pan') {
+            nextValue = filterDigitsOnly(value, 9);
+        } else if (name === 'phone') {
+            nextValue = filterDigitsOnly(value, 10);
+        }
+        
         setForm((prev) => ({
             ...prev,
-            [name]: type === 'checkbox' ? checked : value,
+            [name]: nextValue,
         }));
+        
+        if (fieldErrors[name]) {
+            setFieldErrors((prev) => ({ ...prev, [name]: '' }));
+        }
     };
+
+    const validateForm = () => {
+        const errors = {
+            name: validateName(form.name, { required: true, label: "Contact name" }),
+            pan: validatePan(form.pan),
+            phone: validateNepaliPhone(form.phone),
+            email: validateEmail(form.email),
+        };
+        Object.keys(errors).forEach((key) => { if (!errors[key]) delete errors[key]; });
+        return errors;
+    }
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setModalError('');
+
+        const errors = validateForm();
+        if (Object.keys(errors).length > 0) {
+            setFieldErrors(errors);
+            return;
+        }
+        setFieldErrors({});
         setSubmitting(true);
     
         try {
@@ -171,12 +214,14 @@ export default function Contacts() {
                     <SquarePen size={16} />
                 </button>
 
-                <button
-                    onClick={() => handleDelete(contact.id)}
-                    className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
-                >
-                    <Trash2 size={16} />
-                </button>
+                {canDelete && (
+                    <button
+                        onClick={() => handleDelete(contact.id)}
+                        className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
+                    >
+                        <Trash2 size={16} />
+                    </button>
+                )}
             </div>
         ) },
     ];
@@ -220,8 +265,9 @@ export default function Contacts() {
                             value={form.name}
                             onChange={handleChange}
                             placeholder="e.g. Kathmandu Traders Pvt. Ltd."
-                            className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
+                            className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.name ? 'border-red-400' : 'border-gray-200'} bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition`}
                         />
+                        {fieldErrors.name && <p className="mt-1 text-xs text-red-500">{fieldErrors.name}</p>}
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -247,8 +293,10 @@ export default function Contacts() {
                                 value={form.pan}
                                 onChange={handleChange}
                                 placeholder="123456789"
-                                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
+                                maxLength={9}
+                                className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.pan ? 'border-red-400' : 'border-gray-200'} bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition`}
                             />
+                            {fieldErrors.pan && <p className="mt-1 text-xs text-red-500">{fieldErrors.pan}</p>}
                         </div>
                     </div>
 
@@ -260,8 +308,10 @@ export default function Contacts() {
                                 value={form.phone}
                                 onChange={handleChange}
                                 placeholder="98XXXXXXXX"
-                                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
+                                maxLength={10}
+                                className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.phone ? 'border-red-400' : 'border-gray-200'} bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition`}
                             />
+                            {fieldErrors.phone && <p className="mt-1 text-xs text-red-500">{fieldErrors.phone}</p>}
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
@@ -271,8 +321,9 @@ export default function Contacts() {
                                 value={form.email}
                                 onChange={handleChange}
                                 placeholder="contact@example.com"
-                                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
+                                className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.email ? 'border-red-400' : 'border-gray-200'} bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition`}
                             />
+                            {fieldErrors.email && <p className="mt-1 text-xs text-red-500">{fieldErrors.email}</p>}
                         </div>
                     </div>
 
