@@ -35,15 +35,26 @@ $address = trim($data['address'] ?? '');
 $email = trim($data['email'] ?? '');
 $phone = trim($data['phone'] ?? '');
 $pan = trim($data['pan'] ?? '');
-$tdsDeducted = ($data['tds_deducted'] ?? false) ? 'true' : 'false';
+$tdsDeducted = ($data['tds_deducted'] ?? false) ? 1 : 0;
 
 // Validation
 $errors = [];
 
+$errors = [];
+
 if ($id <= 0) $errors[] = 'A valid contact ID is required';
 if ($name === '') $errors[] = "Contact name is required.";
+if ($name !== '' && !preg_match("/^[A-Za-z\s.,'&-]+$/", $name)) {
+    $errors[] = "Contact name can only contain letters, spaces, and . , ' & -";
+}
 if (!in_array($type, ['Customer', 'Vendor', 'Employee'], true)) $errors[] = "Type must be Customer, Vendor or Employee.";
 if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = "Enter a valid email.";
+if ($pan !== '' && !preg_match('/^\d{9}$/', $pan)) {
+    $errors[] = "PAN must be exactly 9 digits, numbers only.";
+}
+if ($phone !== '' && !preg_match('/^98\d{8}$/', $phone)) {
+    $errors[] = "Phone number must be 10 digits and start with 98.";
+}
 
 if ($errors) {
     http_response_code(400);
