@@ -36,6 +36,10 @@ $notes = trim($data['notes'] ?? '');
 $status = $data['status'] ?? 'DRAFT';
 $lineItems = $data['line_items'] ?? [];
 
+if ($_SESSION['role'] !== 'admin') {
+    $status = 'DRAFT';
+}
+
 $validStatuses = ['DRAFT', 'APPROVED'];
 
 // Validation

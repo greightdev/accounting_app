@@ -36,6 +36,10 @@ $amount = $data['amount'] ?? 0;
 $notes = trim($data['notes'] ?? '');
 $status = $data['status'] ?? 'DRAFT';
 
+if ($_SESSION['role'] !== 'admin') {
+    $status = 'DRAFT';
+}
+
 $validStatuses = ['DRAFT', 'APPROVED'];
 
 // Validation
