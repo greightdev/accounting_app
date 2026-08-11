@@ -3,6 +3,7 @@
 require_once '../server.php';
 require_once '../db.php';
 require_once '../includes/auth.php';
+require_once '../includes/audit.php';
 
 requireRole(['admin', 'accountant']);
 
@@ -56,7 +57,7 @@ if ($errors) {
 try {
     // Check if it exists
     $existing = $pdo->prepare("
-        SELECT id, type, status
+        SELECT id, type, status, date, bank_account_id, contra_account_id, total_amount, notes
         FROM transactions
         WHERE id = ? AND type IN ('BANK_DEP','BANK_WITH')
     ");
@@ -107,6 +108,16 @@ try {
     ")->execute([$date, $bankAccountId, $accountId, $amount, $notes ?: null, $id]);
 
     $pdo->commit();
+
+    logAudit(
+        $pdo,
+        (int) $_SESSION['user_id'],
+        'UPDATE',
+        'transactions',
+        $id,
+        ['date' => $tx['date'], 'bank_account_id' => (int)$tx['bank_account_id'], 'account_id' => (int)$tx['contra_account_id'], 'amount' => (float)$tx['total_amount'], 'notes' => $tx['notes']],
+        ['date' => $date, 'bank_account_id' => (int)$bankAccountId, 'account_id' => (int)$accountId, 'amount' => (float)$amount, 'notes' => $notes ?: null]
+    );
 
     http_response_code(200);
     echo json_encode([
