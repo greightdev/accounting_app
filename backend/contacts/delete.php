@@ -3,6 +3,7 @@
 require_once '../server.php';
 require_once '../db.php';
 require_once '../includes/auth.php';
+require_once '../includes/audit.php';
 
 requireRole(['admin']);
 
@@ -42,12 +43,13 @@ if ($id <= 0) {
 try {
     // Check contact exists
     $existing = $pdo->prepare("
-        SELECT id
+        SELECT id, name
         FROM contacts
         WHERE id = ? AND is_active = TRUE
     ");
     $existing->execute([$id]);
-    if (!$existing->fetch()) {
+    $contact = $existing->fetch();
+    if (!$contact) {
         http_response_code(404);
         echo json_encode([
             "success" => false,
@@ -80,6 +82,16 @@ try {
         WHERE id = ?
     ");
     $stmt->execute([$id]);
+
+    logAudit(
+        $pdo,
+        (int) $_SESSION['user_id'],
+        'DELETE',
+        'contacts',
+        $id,
+        ['name' => $contact['name'], 'is_active' => true],
+        ['is_active' => false]
+    );
 
     http_response_code(200);
     echo json_encode([

@@ -3,6 +3,7 @@
 require_once '../server.php';
 require_once '../db.php';
 require_once '../includes/auth.php';
+require_once '../includes/audit.php';
 
 requireRole(['admin', 'accountant']);
 
@@ -105,6 +106,16 @@ try {
         $openingDate
     ]);
     $newId = (int) $pdo->lastInsertId();
+
+    logAudit(
+        $pdo,
+        (int) $_SESSION['user_id'],
+        'CREATE',
+        'contacts',
+        $newId,
+        null,
+        ['name' => $name, 'type' => $type, 'pan' => $pan ?: null, 'phone' => $phone ?: null, 'email' => $email ?: null]
+    );
 
     http_response_code(201);
     echo json_encode([

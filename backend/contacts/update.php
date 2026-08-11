@@ -3,6 +3,7 @@
 require_once '../server.php';
 require_once '../db.php';
 require_once '../includes/auth.php';
+require_once '../includes/audit.php';
 
 requireRole(['admin', 'accountant']);
 
@@ -40,8 +41,6 @@ $tdsDeducted = ($data['tds_deducted'] ?? false) ? 1 : 0;
 // Validation
 $errors = [];
 
-$errors = [];
-
 if ($id <= 0) $errors[] = 'A valid contact ID is required';
 if ($name === '') $errors[] = "Contact name is required.";
 if ($name !== '' && !preg_match("/^[A-Za-z\s.,'&-]+$/", $name)) {
@@ -68,7 +67,7 @@ if ($errors) {
 try {
     // Check contact exists
     $existing = $pdo->prepare("
-        SELECT id, email
+        SELECT id, name, type, pan, phone, email, address, tds_deducted
         FROM contacts
         WHERE id = ? AND is_active = TRUE
     ");
@@ -124,6 +123,16 @@ try {
         $tdsDeducted,
         $id
     ]);
+
+    logAudit(
+        $pdo,
+        (int) $_SESSION['user_id'],
+        'UPDATE',
+        'contacts',
+        $id,
+        ['name' => $contacts['name'], 'type' => $contacts['type'], 'pan' => $contacts['pan'], 'phone' => $contacts['phone'], 'email' => $contacts['email'], 'address' => $contacts['address'], 'tds_deducted' => $contacts['tds_deducted']],
+        ['name' => $name, 'type' => $type, 'pan' => $pan ?: null, 'phone' => $phone ?: null, 'email' => $email ?: null, 'address' => $address ?: null, 'tds_deducted' => $tdsDeducted]
+    );
 
     http_response_code(200);
     echo json_encode([
