@@ -3,6 +3,7 @@
 require_once '../server.php';
 require_once '../db.php';
 require_once '../includes/auth.php';
+require_once '../includes/audit.php';
 
 requireRole(['admin']);
 
@@ -59,7 +60,7 @@ if ($errors) {
 
 try {
     $existing = $pdo->prepare("
-        SELECT id, role, is_active
+        SELECT id, name, email, role, is_active
         FROM users
         WHERE id = ?
     ");
@@ -122,6 +123,16 @@ try {
         WHERE id = ?
     ");
     $stmt->execute([$name, $email, $role, $id]);
+
+    logAudit(
+        $pdo,
+        (int) $_SESSION['user_id'],
+        'UPDATE',
+        'users',
+        $id,
+        ['name' => $user['name'], 'email' => $user['email'], 'role' => $user['role']],
+        ['name' => $name, 'email' => $email, 'role' => $role]
+    );
 
     http_response_code(200);
     echo json_encode([

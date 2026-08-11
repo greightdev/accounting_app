@@ -3,6 +3,7 @@
 require_once '../server.php';
 require_once '../db.php';
 require_once '../includes/auth.php';
+require_once '../includes/audit.php';
 
 requireRole(['admin']);
 
@@ -86,12 +87,22 @@ try {
         VALUES (?, ?, ?, ?, TRUE)
     ");
     $stmt->execute([$name, $email, $passwordHash, $role]);
+    $newId = (int) $pdo->lastInsertId();
 
+    logAudit(
+        $pdo,
+        (int) $_SESSION['user_id'],
+        'CREATE',
+        'users',
+        $newId,
+        null,
+        ['name' => $name, 'email' => $email, 'role' => $role, 'is_active' => true]
+    );
     http_response_code(201);
     echo json_encode([
         "success" => true,
         "message" => "User created successfully.",
-        "data" => ["id" => (int) $pdo->lastInsertId()],
+        "data" => ["id" => $newId],
     ]);
 } catch (PDOException $e) {
     error_log("Create user error: " . $e->getMessage());
