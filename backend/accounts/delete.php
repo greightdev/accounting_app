@@ -3,6 +3,7 @@
 require_once '../server.php';
 require_once '../db.php';
 require_once '../includes/auth.php';
+require_once '../includes/audit.php';
 
 requireRole(['admin']);
 
@@ -108,6 +109,16 @@ try {
     }
 
     $pdo->commit();
+
+    logAudit(
+        $pdo,
+        (int) $_SESSION['user_id'],
+        'DELETE',
+        'accounts',
+        $id,
+        ['name' => $account['name'], 'is_active' => true],
+        ['is_active' => false]
+    );
 
     http_response_code(200);
     echo json_encode([

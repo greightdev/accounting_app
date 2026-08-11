@@ -4,6 +4,7 @@ require_once '../server.php';
 require_once '../db.php';
 require_once '../includes/auth.php';
 require_once '../includes/helpers.php';
+require_once '../includes/audit.php';
 
 requireRole(['admin', 'accountant']);
 
@@ -37,7 +38,13 @@ $accountGroupId = $data['account_group_id'] ?? null;
 $errors = [];
 
 if ($id <= 0) $errors[] = 'A valid account ID is required';
-if ($name === '') $errors[] = "Account name is required.";
+if ($name === '') {
+    $errors[] = "Account name is required.";
+} elseif (strlen($name) > 150) {
+    $errors[] = "Account name must be 150 characters or fewer.";
+} elseif (!preg_match("/^[A-Za-z0-9\s.,'&()\/-]+$/", $name)) {
+    $errors[] = "Account name can only contain letters, numbers, spaces, and . , ' & ( ) / -";
+}
 if (!$accountGroupId) $errors[] = "Account group id is required.";
 
 if ($errors) {
@@ -206,6 +213,16 @@ try {
     }
 
     $pdo->commit();
+
+    logAudit(
+        $pdo,
+        (int) $_SESSION['user_id'],
+        'UPDATE',
+        'accounts',
+        $id,
+        ['name' => $account['name'], 'account_group_id' => (int)$account['account_group_id'], 'code' => $account['code']],
+        ['name' => $name, 'account_group_id' => (int)$accountGroupId, 'code' => $newCode]
+    );
 
     http_response_code(200);
     echo json_encode([
