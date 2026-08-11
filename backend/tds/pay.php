@@ -3,6 +3,7 @@
 require_once '../server.php';
 require_once '../db.php';
 require_once '../includes/auth.php';
+require_once '../includes/audit.php';
 
 requireRole(['admin', 'accountant']);
 
@@ -179,6 +180,16 @@ try {
     }
 
     $pdo->commit();
+
+    logAudit(
+        $pdo,
+        (int) $_SESSION['user_id'],
+        'CREATE',
+        'transactions',
+        $txId,
+        null,
+        ['type' => 'TDS_PAYMENT', 'ref_number' => $refNumber, 'bank_account_id' => (int)$bankAccountId, 'total_amount' => $totalTds, 'fiscal_year' => $fiscalYear, 'tds_entry_ids' => array_column($tdsEntries, 'id')]
+    );
 
     http_response_code(201);
     echo json_encode([
