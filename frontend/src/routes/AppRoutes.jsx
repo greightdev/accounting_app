@@ -14,9 +14,11 @@ import Deposits from "../pages/banking/Deposits";
 import Withdrawals from "../pages/banking/Withdrawals";
 import Journal from "../pages/Journal";
 import ChartofAccounts from "../pages/ChartofAccounts";
+import Users from "../pages/Users";
 import AccountReports from "../pages/AccountReports";
 import ReportViewer from "../pages/ReportViewer";
 import Settings from "../pages/Settings";
+import ProtectedRoute from "../context/ProtectedRoute";
 
 export default function AppRoutes() {
   return (
@@ -24,6 +26,7 @@ export default function AppRoutes() {
       <Routes>
         <Route path="/" element={<Login />} />
 
+        <Route element={<ProtectedRoute />}>
           <Route element={<DashboardLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/contacts" element={<Contacts />} />
@@ -37,10 +40,12 @@ export default function AppRoutes() {
             <Route path="/banking/withdrawals" element={<Withdrawals />} />
             <Route path="/journal" element={<Journal />} />
             <Route path="/chartofaccounts" element={<ChartofAccounts />} />
+            <Route path="/users" element={<Users />} />
             <Route path="/reports" element={<AccountReports />} />
             <Route path="/reports/:reportKey" element={<ReportViewer />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
+        </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
