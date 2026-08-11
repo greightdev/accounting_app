@@ -3,6 +3,7 @@
 require_once '../../server.php';
 require_once '../../db.php';
 require_once '../../includes/auth.php';
+require_once '../../includes/audit.php';
 
 requireRole(['admin', 'accountant', 'user']);
 
@@ -271,6 +272,16 @@ try {
     }
 
     $pdo->commit();
+
+    logAudit(
+        $pdo,
+        (int) $_SESSION['user_id'],
+        'CREATE',
+        'transactions',
+        $txId,
+        null,
+        ['type' => 'SALES', 'ref_number' => $refNumber, 'contact_id' => (int)$contactId, 'sub_total' => $subTotal, 'vat_amount' => $vatTotal, 'total_amount' => $grandTotal, 'status' => $status]
+    );
 
     http_response_code(201);
     echo json_encode([

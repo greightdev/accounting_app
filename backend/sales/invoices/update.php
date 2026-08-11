@@ -3,6 +3,7 @@
 require_once '../../server.php';
 require_once '../../db.php';
 require_once '../../includes/auth.php';
+require_once '../../includes/audit.php';
 
 requireRole(['admin', 'accountant']);
 
@@ -57,7 +58,7 @@ if ($errors) {
 try {
     // Check invoice exists
     $existing = $pdo->prepare("
-        SELECT id, status, ref_number
+        SELECT id, status, ref_number, contact_id, date, due_date, sub_total, vat_amount, total_amount, notes
         FROM transactions
         WHERE id = ? AND type = 'SALES'
     ");
@@ -237,6 +238,16 @@ try {
     }
 
     $pdo->commit();
+
+    logAudit(
+        $pdo,
+        (int) $_SESSION['user_id'],
+        'UPDATE',
+        'transactions',
+        $id,
+        ['contact_id' => (int)$invoice['contact_id'], 'date' => $invoice['date'], 'due_date' => $invoice['due_date'], 'sub_total' => (float)$invoice['sub_total'], 'vat_amount' => (float)$invoice['vat_amount'], 'total_amount' => (float)$invoice['total_amount'], 'notes' => $invoice['notes']],
+        ['contact_id' => (int)$contactId, 'date' => $date, 'due_date' => $dueDate, 'sub_total' => $subTotal, 'vat_amount' => $vatTotal, 'total_amount' => $grandTotal, 'notes' => $notes ?: null]
+    );
 
     http_response_code(200);
     echo json_encode([
