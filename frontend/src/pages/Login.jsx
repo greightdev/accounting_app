@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
+import { useAuth } from "../context/AuthContext";
+import { homeRouteFor } from "../permissions";
 
 export default function Login() {
     const navigate = useNavigate();
+    const { login } = useAuth();
 
     const [form, setForm] = useState({
         email: '',
@@ -52,7 +55,8 @@ export default function Login() {
             });
 
             if (data.success) {
-                navigate('/dashboard');
+                login(data.user);
+                navigate(homeRouteFor(data.user.role));
             }
         } catch (err) {
             const status = err.response?.status;

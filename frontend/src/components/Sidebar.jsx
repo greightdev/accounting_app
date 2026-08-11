@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { isRouteAllowed } from "../permissions";
 
 const navItems = [
     { label: 'Dashboard', path: '/dashboard' },
@@ -33,6 +35,19 @@ const navItems = [
     { label: 'Settings', path: '/settings' },
 ];
 
+function filterNavItems(items, role) {
+  return items
+    .map((item) => {
+      if (item.children) {
+        const children = item.children.filter((child) => isRouteAllowed(role, child.path));
+        if (children.length === 0) return null;
+        return { ...item, children };
+      }
+      return isRouteAllowed(role, item.path) ? item : null;
+    })
+    .filter(Boolean);
+}
+
 const STORAGE_KEY = 'sidebar_open_menus'
 
 function getStoredOpenMenus() {
@@ -46,6 +61,7 @@ function getStoredOpenMenus() {
 
 export default function Sidebar() {
   const location = useLocation();
+  const { role } = useAuth();
   const [ openMenus, setOpenMenus ] = useState(getStoredOpenMenus);
 
   const toggleMenu = (label) => {
@@ -59,6 +75,8 @@ export default function Sidebar() {
   const isChildActive = (children) => 
     children.some((child) => location.pathname.startsWith(child.path));
 
+  const visibleNavItems = filterNavItems(navItems, role);
+
   return (
     <aside className="w-60 h-screen bg-slate-700 text-slate-200 flex flex-col py-5 shrink-0">
       <div className="flex items-center gap-2.5 px-5 mb-7">
@@ -69,7 +87,7 @@ export default function Sidebar() {
       </div>
  
       <nav className="flex-1 overflow-y-auto flex flex-col gap-1 px-3">
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           // Item with a dropdown
           if (item.children) {
             const isOpen = !!openMenus[item.label];

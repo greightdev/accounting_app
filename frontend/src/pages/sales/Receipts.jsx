@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
+import { can } from "../../permissions";
 import Toolbar from "../../components/Toolbar";
 import Tabs from "../../components/Tabs";
 import api from "../../api/axios";
@@ -22,6 +24,8 @@ const currentFiscalYear = () => {
 
 
 export default function Receipts() {
+    const { role } = useAuth();
+    const canVoid = can(role, "canVoid");
     const [receipts, setReceipts] = useState([]);
     const [contacts, setContacts] = useState([]);
     const [bankAccounts, setBankAccounts] = useState([]);
@@ -159,6 +163,8 @@ export default function Receipts() {
         }
     ];
 
+    const visibleColumns = canVoid ? columns : columns.filter((c) => c.key !== "actions");
+
     return (
         <>
             <Toast toast={toast} onClose={hideToast} />
@@ -188,7 +194,7 @@ export default function Receipts() {
                     
                     <div className="bg-white rounded-lg shadow">
                         <DataTable
-                            columns={columns}
+                            columns={visibleColumns}
                             data={filtered}
                             loading={loading}
                             emptyMessage="No receipts found"

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { SquarePen, Trash2, Check, X } from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
+import { can } from "../../permissions";
 import Tabs from "../../components/Tabs";
 import Toolbar from "../../components/Toolbar";
 import api from "../../api/axios";
@@ -20,6 +22,10 @@ const paymentStatusStyles = (paymentStatus) => {
 };
 
 export default function Invoices() {
+    const { role } = useAuth();
+    const canApprove = can(role, "canApprove");
+    const canVoid = can(role, "canVoid");
+    const canEditTx = can(role, "canEditTransactions");
     const [invoices, setInvoices] = useState([]);
     const [contacts, setContacts] = useState([]);
     const [items, setItems] = useState([]);
@@ -220,13 +226,13 @@ export default function Invoices() {
 
     const approvedColumns = [
         ...baseColumns,
-        approvedActions,
+        ...(canVoid ? [approvedActions]: []),
     ];
 
     const draftColumns = [
         ...baseColumns,
-        draftActions,
-        approvalColumn,
+        ...(canEditTx ? [draftActions] : []),
+        ...(canApprove || canVoid ? [approvalColumn]: []),
     ];
 
     return (

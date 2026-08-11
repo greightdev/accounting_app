@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { can } from "../permissions";
 
 const labelCls = "block text-sm font-medium text-gray-700 mb-1.5";
 const inputCls = "w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition";
@@ -42,6 +44,8 @@ export default function BankTransferForm({
     onCreate,
     onClose,
 }) {
+    const { role } = useAuth();
+    const canApprove = can(role, "canApprove");
     const isDeposit = mode === "deposit";
 
     const isEditing = Boolean(initialData);
@@ -212,7 +216,7 @@ export default function BankTransferForm({
                     >
                         Save Draft
                     </button>
-                    {!isEditing && (
+                    {!isEditing && canApprove && (
                         <button
                             type="button"
                             onClick={() => handleSubmit(true)}

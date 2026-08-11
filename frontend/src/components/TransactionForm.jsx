@@ -1,5 +1,7 @@
 import { useRef, useState } from "react";
 import { X, ChevronRight, ChevronDown, Plus, Trash2 } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { can } from "../permissions";
 
 // TransactionForm — generic layout for any line-item document:
 // Sales Invoice, Purchase Bill, etc.
@@ -67,6 +69,8 @@ export default function TransactionForm({
     onClose,
     onCreate,
 }) {
+    const { role } = useAuth();
+    const canApprove = can(role, "canApprove");
     const nextRowId = useRef(1);
 
     const [date, setDate] = useState(initialData?.date ?? toLocalDate(new Date()));
@@ -513,13 +517,15 @@ export default function TransactionForm({
                     >
                         {submitLabel}
                     </button>
-                    <button
-                        type="button"
-                        onClick={() => handleSubmit(true)}
-                        className="px-6 py-2.5 rounded-lg bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition"
-                    >
-                        {approveLabel}
-                    </button>
+                    {canApprove && (
+                        <button
+                            type="button"
+                            onClick={() => handleSubmit(true)}
+                            className="px-6 py-2.5 rounded-lg bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition"
+                        >
+                            {approveLabel}
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

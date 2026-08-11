@@ -8,6 +8,8 @@ import Modal from "../components/Modal";
 import { SquarePen, Trash2 } from "lucide-react";
 import Toast from "../components/Toast";
 import useToast from "../hooks/useToast";
+import { useAuth } from "../context/AuthContext";
+import { can } from "../permissions";
 
 const emptyAccountForm = { name: '', account_group_id: '' };
 const emptyGroupForm = { name: '', parent_id: '' };
@@ -74,6 +76,8 @@ const COA_TABS = [
 ];
 
 export default function ChartofAccounts() {
+    const { role } = useAuth();
+    const canDelete = can(role, "canDelete");
     const [coaTree, setCoaTree] = useState([]);
     const [groupsFlat, setGroupsFlat] = useState([]);
     const [accounts, setAccounts] = useState([]);
@@ -322,12 +326,14 @@ export default function ChartofAccounts() {
                     <SquarePen size={16} />
                 </button>
 
-                <button
-                    onClick={() => handleDelete(account.id)}
-                    className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
-                >
-                    <Trash2 size={16} />
-                </button>
+                {canDelete && (
+                    <button
+                        onClick={() => handleDelete(account.id)}
+                        className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
+                    >
+                        <Trash2 size={16} />
+                    </button>
+                )}
             </div>
         ) },
     ];
@@ -346,12 +352,14 @@ export default function ChartofAccounts() {
                     <SquarePen size={16} />
                 </button>
 
-                <button
-                    onClick={() => handleGroupDelete(group.id)}
-                    className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
-                >
-                    <Trash2 size={16} />
-                </button>
+                {canDelete && (
+                    <button
+                        onClick={() => handleGroupDelete(group.id)}
+                        className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
+                    >
+                        <Trash2 size={16} />
+                    </button>
+                )}
             </div>
         ) },
     ];
@@ -390,9 +398,9 @@ export default function ChartofAccounts() {
                                     node={node}
                                     isLast={index === filteredTree.length -1}
                                     onEdit={openEditModal}
-                                    onDelete={handleDelete}
+                                    onDelete={canDelete ? handleDelete: undefined}
                                     onEditGroup={openEditGroupModal}
-                                    onDeleteGroup={handleGroupDelete}
+                                    onDeleteGroup={canDelete ? handleGroupDelete: undefined}
                                     forceExpand={!!search.trim()}
                                 />
                             ))
