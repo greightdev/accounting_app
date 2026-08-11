@@ -3,6 +3,7 @@
 require_once '../server.php';
 require_once '../db.php';
 require_once '../includes/auth.php';
+require_once '../includes/audit.php';
 
 requireRole(['admin', 'accountant']);
 
@@ -41,6 +42,7 @@ $validTaxTypes = ['VAT13', 'Exempt'];
 // Validation
 $errors = [];
 
+if ($id <= 0) $errors[] = 'A valid item ID is required';
 if ($name === '') {
     $errors[] = "Item name is required.";
 } elseif (strlen($name) > 150) {
@@ -81,7 +83,7 @@ if ($errors) {
 try {
     // Check item exists
     $existing = $pdo->prepare("
-        SELECT id, name
+        SELECT id, name, unit, hsn_sac_code, selling_price, purchase_rate, tax_type
         FROM items
         WHERE id = ? AND is_active = TRUE
     ");
@@ -135,6 +137,16 @@ try {
         $taxType,
         $id
     ]);
+
+    logAudit(
+        $pdo,
+        (int) $_SESSION['user_id'],
+        'UPDATE',
+        'items',
+        $id,
+        ['name' => $item['name'], 'unit' => $item['unit'], 'hsn_sac_code' => $item['hsn_sac_code'], 'selling_price' => (float)$item['selling_price'], 'purchase_rate' => (float)$item['purchase_rate'], 'tax_type' => $item['tax_type']],
+        ['name' => $name, 'unit' => $unit, 'hsn_sac_code' => $hsnSacCode, 'selling_price' => (float)$sellingPrice, 'purchase_rate' => (float)$purchaseRate, 'tax_type' => $taxType]
+    );
 
     http_response_code(200);
     echo json_encode([

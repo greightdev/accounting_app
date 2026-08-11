@@ -3,6 +3,7 @@
 require_once '../server.php';
 require_once '../db.php';
 require_once '../includes/auth.php';
+require_once '../includes/audit.php';
 
 requireRole(['admin']);
 
@@ -42,12 +43,13 @@ if ($id <= 0) {
 try {
     // Check item exists
     $existing = $pdo->prepare("
-        SELECT id
+        SELECT id, name
         FROM items
         WHERE id = ? AND is_active = TRUE
     ");
     $existing->execute([$id]);
-    if (!$existing->fetch()) {
+    $item = $existing->fetch();
+    if (!$item) {
         http_response_code(404);
         echo json_encode([
             "success" => false,
@@ -82,6 +84,16 @@ try {
         WHERE id = ?
     ");
     $stmt->execute([$id]);
+
+    logAudit(
+        $pdo,
+        (int) $_SESSION['user_id'],
+        'DELETE',
+        'items',
+        $id,
+        ['name' => $item['name'], 'is_active' => true],
+        ['is_active' => false]
+    );
 
     http_response_code(200);
     echo json_encode([

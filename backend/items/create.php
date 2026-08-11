@@ -3,6 +3,7 @@
 require_once '../server.php';
 require_once '../db.php';
 require_once '../includes/auth.php';
+require_once '../includes/audit.php';
 
 requireRole(['admin', 'accountant']);
 
@@ -116,6 +117,16 @@ try {
         $taxType
     ]);
     $newId = (int) $pdo->lastInsertId();
+
+    logAudit(
+        $pdo,
+        (int) $_SESSION['user_id'],
+        'CREATE',
+        'items',
+        $newId,
+        null,
+        ['name' => $name, 'unit' => $unit, 'hsn_sac_code' => $hsnSacCode, 'selling_price' => (float)$sellingPrice, 'purchase_rate' => (float)$purchaseRate, 'tax_type' => $taxType]
+    );
 
     http_response_code(201);
     echo json_encode([
