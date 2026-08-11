@@ -3,6 +3,7 @@
 require_once '../../server.php';
 require_once '../../db.php';
 require_once '../../includes/auth.php';
+require_once '../../includes/audit.php';
 
 requireRole(['admin', 'accountant']);
 
@@ -56,7 +57,7 @@ if ($errors) {
 try {
     // Check bill exists
     $existing = $pdo->prepare("
-        SELECT id, status, ref_number
+        SELECT id, status, ref_number, contact_id, date, due_date, sub_total, vat_amount, total_amount, notes
         FROM transactions
         WHERE id = ? AND type = 'PURCHASE'
     ");
@@ -239,6 +240,16 @@ try {
     }
 
     $pdo->commit();
+
+    logAudit(
+        $pdo,
+        (int) $_SESSION['user_id'],
+        'UPDATE',
+        'transactions',
+        $id,
+        ['contact_id' => (int)$bill['contact_id'], 'date' => $bill['date'], 'due_date' => $bill['due_date'], 'sub_total' => (float)$bill['sub_total'], 'vat_amount' => (float)$bill['vat_amount'], 'total_amount' => (float)$bill['total_amount'], 'notes' => $bill['notes']],
+        ['contact_id' => (int)$contactId, 'date' => $date, 'due_date' => $dueDate ?: null, 'sub_total' => $subTotal, 'vat_amount' => $vatTotal, 'total_amount' => $grandTotal, 'notes' => $fullNotes]
+    );
 
     http_response_code(200);
     echo json_encode([
