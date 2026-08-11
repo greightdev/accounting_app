@@ -3,6 +3,7 @@
 require_once '../server.php';
 require_once '../db.php';
 require_once '../includes/auth.php';
+require_once '../includes/audit.php';
 
 requireRole(['admin', 'accountant']);
 
@@ -47,7 +48,7 @@ if ($errors) {
 
 try {
     $existing = $pdo->prepare("
-        SELECT id, status
+        SELECT id, status, date, total_amount, notes
         FROM transactions
         WHERE id = ? AND type = 'JOURNAL'
     ");
@@ -133,6 +134,14 @@ try {
         exit();
     }
 
+    $oldLinesStmt = $pdo->prepare("
+        SELECT account_id, debit, credit, narration
+        FROM journal_lines
+        WHERE transaction_id = ?
+    ");
+    $oldLinesStmt->execute([$id]);
+    $oldLines = $oldLinesStmt->fetchAll();
+
     $pdo->beginTransaction();
 
     $pdo->prepare("
@@ -184,6 +193,16 @@ try {
     }
 
     $pdo->commit();
+
+    logAudit(
+        $pdo,
+        (int) $_SESSION['user_id'],
+        'UPDATE',
+        'transactions',
+        $id,
+        ['date' => $tx['date'], 'total_amount' => (float)$tx['total_amount'], 'notes' => $tx['notes'], 'lines' => $oldLines],
+        ['date' => $date, 'total_amount' => $totalDebit, 'notes' => $notes ?: null, 'lines' => $validLines]
+    );
 
     http_response_code(200);
     echo json_encode([
