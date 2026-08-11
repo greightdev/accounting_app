@@ -3,6 +3,7 @@
 require_once '../server.php';
 require_once '../db.php';
 require_once '../includes/auth.php';
+require_once '../includes/audit.php';
 
 requireRole(['admin']);
 
@@ -148,6 +149,16 @@ try {
     }
 
     $pdo->commit();
+
+    logAudit(
+        $pdo,
+        (int) $_SESSION['user_id'],
+        'VOID',
+        'transactions',
+        $id,
+        ['status' => $tx['status']],
+        ['status' => 'VOID', 'void_reason' => $voidReason ?: null]
+    );
 
     $label = match($tx['type']) {
         'SALES' => 'Invoice',
