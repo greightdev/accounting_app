@@ -3,6 +3,7 @@
 require_once '../server.php';
 require_once '../db.php';
 require_once '../includes/auth.php';
+require_once '../includes/audit.php';
 
 requireRole(['admin']);
 
@@ -42,7 +43,7 @@ if ($id <= 0) {
 try {
     // Check account group exists
     $existing = $pdo->prepare("
-        SELECT id, parent_id
+        SELECT id, name, parent_id
         FROM account_groups
         WHERE id = ? AND is_active = TRUE
     ");
@@ -109,6 +110,16 @@ try {
         WHERE id = ?
     ");
     $stmt->execute([$id]);
+
+    logAudit(
+        $pdo,
+        (int) $_SESSION['user_id'],
+        'DELETE',
+        'account_groups',
+        $id,
+        ['name' => $group['name'], 'is_active' => true],
+        ['is_active' => false]
+    );
 
     http_response_code(200);
     echo json_encode([

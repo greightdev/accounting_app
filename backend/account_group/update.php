@@ -4,6 +4,7 @@ require_once '../server.php';
 require_once '../db.php';
 require_once '../includes/auth.php';
 require_once '../includes/helpers.php';
+require_once '../includes/audit.php';
 
 requireRole(['admin', 'accountant']);
 
@@ -37,7 +38,13 @@ $parentId = $data['parent_id'] ?? null;
 $errors = [];
 
 if ($id <= 0) $errors[] = 'A valid account group ID is required';
-if ($name === '') $errors[] = "Account group name is required.";
+if ($name === '') {
+    $errors[] = "Account group name is required.";
+} elseif (strlen($name) > 100) {
+    $errors[] = "Account group name must be 100 characters or fewer.";
+} elseif (!preg_match("/^[A-Za-z0-9\s.,'&()\/-]+$/", $name)) {
+    $errors[] = "Account group name can only contain letters, numbers, spaces, and . , ' & ( ) / -";
+}
 if (!$parentId) $errors[] = "Parent group is required.";
 
 if ($errors) {
@@ -52,7 +59,7 @@ if ($errors) {
 try {
     // Check group exists
     $existing = $pdo->prepare("
-        SELECT id, name, code, parent_id
+        SELECT id, name, code, parent_id, type
         FROM account_groups
         WHERE id = ? AND is_active = TRUE
     ");
@@ -172,6 +179,16 @@ try {
     }
 
     $pdo->commit();
+
+    logAudit(
+        $pdo,
+        (int) $_SESSION['user_id'],
+        'UPDATE',
+        'account_groups',
+        $id,
+        ['name' => $group['name'], 'parent_id' => (int)$group['parent_id'], 'code' => $group['code'], 'type' => $group['type']],
+        ['name' => $name, 'parent_id' => (int)$parentId, 'code' => $newCode, 'type' => $newType]
+    );
 
     http_response_code(200);
     echo json_encode([

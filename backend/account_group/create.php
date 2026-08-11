@@ -4,6 +4,7 @@ require_once "../server.php";
 require_once "../db.php";
 require_once "../includes/auth.php";
 require_once "../includes/helpers.php";
+require_once "../includes/audit.php";
 
 requireRole(['admin', 'accountant']);
 
@@ -35,7 +36,13 @@ $parentId = $data['parent_id'] ?? null;
 // Validation
 $errors = [];
 
-if ($name === '') $errors[] = "Account group name is required.";
+if ($name === '') {
+    $errors[] = "Account group name is required.";
+} elseif (strlen($name) > 100) {
+    $errors[] = "Account group name must be 100 characters or fewer.";
+} elseif (!preg_match("/^[A-Za-z0-9\s.,'&()\/-]+$/", $name)) {
+    $errors[] = "Account group name can only contain letters, numbers, spaces, and . , ' & ( ) / -";
+}
 if (!$parentId) $errors[] = "Parent group is required.";
 
 if ($errors) {
@@ -105,6 +112,16 @@ try {
         $parentId,
     ]);
     $newId = (int) $pdo->lastInsertId();
+
+    logAudit(
+        $pdo,
+        (int) $_SESSION['user_id'],
+        'CREATE',
+        'account_groups',
+        $newId,
+        null,
+        ['name' => $name, 'parent_id' => (int)$parentId, 'code' => $newCode, 'type' => $type]
+    );
 
     http_response_code(201);
     echo json_encode([
