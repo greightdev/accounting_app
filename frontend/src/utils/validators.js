@@ -128,3 +128,14 @@ export function validatePassword(value, { required = true } = {}) {
     }
     return "";
 }
+
+// Accounts
+export function validateGenericName(value, { required = true, label = "Name", maxLen = 150 } = {}) {
+    const v = (value ?? "").trim();
+    if (!v) return required ? `${label} is required.` : "";
+    if (v.length > maxLen) return `${label} must be ${maxLen} characters or fewer.`;
+    if (!ITEM_NAME_REGEX.test(v)) {
+        return `${label} can only contain letters, numbers, spaces, and . , ' & ( ) / -`;
+    }
+    return "";
+}

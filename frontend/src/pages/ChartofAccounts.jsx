@@ -10,6 +10,7 @@ import Toast from "../components/Toast";
 import useToast from "../hooks/useToast";
 import { useAuth } from "../context/AuthContext";
 import { can } from "../permissions";
+import { validateGenericName, filterNameInput } from "../utils/validators";
 
 const emptyAccountForm = { name: '', account_group_id: '' };
 const emptyGroupForm = { name: '', parent_id: '' };
@@ -89,6 +90,7 @@ export default function ChartofAccounts() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingAccount, setEditingAccount] = useState(null);
     const [form, setForm] = useState(emptyAccountForm);
+    const [fieldErrors, setFieldErrors] = useState({});
     const [modalError, setModalError] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
@@ -96,6 +98,7 @@ export default function ChartofAccounts() {
     const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
     const [editingGroup, setEditingGroup] = useState(null);
     const [groupForm, setGroupForm] = useState(emptyGroupForm);
+    const [groupFieldErrors, setGroupFieldErrors] = useState({});
     const [groupModalError, setGroupModalError] = useState('');
     const [groupSubmitting, setGroupSubmitting] = useState(false);
 
@@ -144,6 +147,7 @@ export default function ChartofAccounts() {
         setEditingAccount(null);
         setForm(emptyAccountForm);
         setModalError('');
+        setFieldErrors({});
         setIsModalOpen(true);
     };
 
@@ -154,6 +158,7 @@ export default function ChartofAccounts() {
             account_group_id: account.account_group_id,
         });
         setModalError('');
+        setFieldErrors({});
         setIsModalOpen(true);
     };
     
@@ -162,17 +167,40 @@ export default function ChartofAccounts() {
         setEditingAccount(null);
         setForm(emptyAccountForm);
         setModalError('');
+        setFieldErrors({});
     };
     
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setForm((prev) => ({ ...prev, [name]: value }));
+        const nextValue = name === 'name' ? filterItemNameInput(value) : value;
+
+        setForm((prev) => ({ ...prev, [name]: nextValue }));
+
+        if (fieldErrors[name]) {
+            setFieldErrors((prev) => ({ ...prev, [name]: '' }));
+        }
+    };
+
+    const validateForm = () => {
+        const errors = {
+            name: validateGenericName(form.name, { label: "Account name", maxLen: 150 }),
+            account_group_id: form.account_group_id ? "" : "Account group is required.",
+        };
+        Object.keys(errors).forEach((key) => { if (!errors[key]) delete errors[key]; });
+        return errors;
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setModalError('');
-        
+
+        const errors = validateForm();
+        if (Object.keys(errors).length > 0) {
+            setFieldErrors(errors);
+            return;
+        }
+        setFieldErrors({});
+
         setSubmitting(true);
     
         try {
@@ -216,6 +244,7 @@ export default function ChartofAccounts() {
         setEditingGroup(null);
         setGroupForm(emptyGroupForm);
         setGroupModalError('');
+        setGroupFieldErrors({});
         setIsGroupModalOpen(true);
     };
 
@@ -226,6 +255,7 @@ export default function ChartofAccounts() {
             parent_id: group.parent_id,
         });
         setGroupModalError('');
+        setGroupFieldErrors({});
         setIsGroupModalOpen(true);
     };
     
@@ -234,26 +264,41 @@ export default function ChartofAccounts() {
         setEditingGroup(null);
         setGroupForm(emptyGroupForm);
         setGroupModalError('');
+        setGroupFieldErrors({});
     };
     
     const handleGroupChange = (e) => {
         const { name, value } = e.target;
-        setGroupForm((prev) => ({ ...prev, [name]: value }));
+        const nextValue = name === 'name' ? filterItemNameInput(value) : value;
+
+        setGroupForm((prev) => ({ ...prev, [name]: nextValue }));
+
+        if (groupFieldErrors[name]) {
+            setGroupFieldErrors((prev) => ({ ...prev, [name]: '' }));
+        }
+    };
+
+    const validateGroupForm = () => {
+        const errors = {
+            name: validateGenericName(groupForm.name, { label: "Group name", maxLen: 100 }),
+            parent_id: groupForm.parent_id ? "" : "Parent group is required.",
+        };
+        Object.keys(errors).forEach((key) => { if (!errors[key]) delete errors[key]; });
+        return errors;
     };
 
     const handleGroupSubmit = async (e) => {
         e.preventDefault();
         setGroupModalError('');
 
-        if (!groupForm.name.trim()) {
-            setGroupModalError("Group name is required.");
-            return;
-        }
-        if (!groupForm.parent_id) {
-            setGroupModalError("Parent group is required.");
+        const errors = validateGroupForm();
+        if (Object.keys(errors).length > 0) {
+            setGroupFieldErrors(errors);
             return;
         }
         
+        setGroupFieldErrors({});
+
         setGroupSubmitting(true);
     
         try {
@@ -450,8 +495,9 @@ export default function ChartofAccounts() {
                             onChange={handleChange}
                             disabled={editingAccount?.is_system}
                             placeholder="e.g. Office Rent"
-                            className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                            className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.name ? 'border-red-400' : 'border-gray-200'} bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition disabled:opacity-60 disabled:cursor-not-allowed`}
                         />
+                        {fieldErrors.name && <p className="mt-1 text-xs text-red-500">{fieldErrors.name}</p>}
                     </div>
     
                     <div>
@@ -461,13 +507,14 @@ export default function ChartofAccounts() {
                             value={form.account_group_id}
                             onChange={handleChange}
                             disabled={editingAccount?.is_system}
-                            className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                            className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.account_group_id ? 'border-red-400' : 'border-gray-200'} bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition disabled:opacity-60 disabled:cursor-not-allowed`}
                         >
                         <option value="">Select a group</option>
                             {groupsFlat.map((group) => (
                                 <option key={group.id} value={group.id}>{group.name}</option>
                             ))}
                         </select>
+                        {fieldErrors.account_group_id && <p className="mt-1 text-xs text-red-500">{fieldErrors.account_group_id}</p>}
                     </div>
                 </Modal>
             )}
@@ -490,8 +537,9 @@ export default function ChartofAccounts() {
                             value={groupForm.name}
                             onChange={handleGroupChange}
                             placeholder="e.g. Fixed Assets"
-                            className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
+                            className={`w-full px-4 py-2.5 rounded-lg border ${groupFieldErrors.name ? 'border-red-400' : 'border-gray-200'} bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition`}
                         />
+                        {groupFieldErrors.name && <p className="mt-1 text-xs text-red-500">{groupFieldErrors.name}</p>}
                     </div>
     
                     <div>
@@ -500,7 +548,7 @@ export default function ChartofAccounts() {
                             name="parent_id"
                             value={groupForm.parent_id}
                             onChange={handleGroupChange}
-                            className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
+                            className={`w-full px-4 py-2.5 rounded-lg border ${groupFieldErrors.parent_id ? 'border-red-400' : 'border-gray-200'} bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition`}
                         >
                         <option value="">Select parent group</option>
                             {groupsFlat
@@ -509,6 +557,7 @@ export default function ChartofAccounts() {
                                     <option key={group.id} value={group.id}>{group.name}</option>
                             ))}
                         </select>
+                        {groupFieldErrors.parent_id && <p className="mt-1 text-xs text-red-500">{groupFieldErrors.parent_id}</p>}
                     </div>
                 </Modal>
             )}
