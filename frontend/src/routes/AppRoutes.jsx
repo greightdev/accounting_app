@@ -18,6 +18,8 @@ import Users from "../pages/Users";
 import AccountReports from "../pages/AccountReports";
 import ReportViewer from "../pages/ReportViewer";
 import Settings from "../pages/Settings";
+import PayTds from "../pages/banking/PayTds";
+import ActivityLogs from "../pages/ActivityLogs";
 import ProtectedRoute from "../context/ProtectedRoute";
 
 export default function AppRoutes() {
@@ -38,11 +40,13 @@ export default function AppRoutes() {
             <Route path="/purchases/payments" element={<Payments />} />
             <Route path="/banking/deposits" element={<Deposits />} />
             <Route path="/banking/withdrawals" element={<Withdrawals />} />
+            <Route path="/banking/paytds" element={<PayTds />} />
             <Route path="/journal" element={<Journal />} />
             <Route path="/chartofaccounts" element={<ChartofAccounts />} />
             <Route path="/users" element={<Users />} />
             <Route path="/reports" element={<AccountReports />} />
             <Route path="/reports/:reportKey" element={<ReportViewer />} />
+            <Route path="/activitylogs" element={<ActivityLogs />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
         </Route>

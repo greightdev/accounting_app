@@ -12,9 +12,11 @@ const PAGE_TITLES = {
   '/purchases/payments': 'Payments',
   '/banking/deposits': 'Deposits',
   '/banking/withdrawals': 'Withdrawals',
+  '/banking/paytds': 'Pay TDS',
   '/journal': 'Journal',
   '/chartofaccounts': 'Chart of Accounts',
   '/reports': 'Reports',
+  '/activitylogs': 'Activity Logs',
   '/settings': 'Settings',
 }
 

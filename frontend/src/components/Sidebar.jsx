@@ -27,11 +27,13 @@ const navItems = [
       children: [
         { label: 'Deposits', path: '/banking/deposits' },
         { label: 'Withdrawals', path: '/banking/withdrawals' },
+        { label: 'Pay TDS', path: '/banking/paytds' },
       ],
     },
     { label: 'Journal', path: '/journal' },
     { label: 'Chart of Accounts', path: '/chartofaccounts' },
     { label: 'Account Reports', path: '/reports' },
+    { label: 'Activity Logs', path: '/activitylogs' },
     { label: 'Settings', path: '/settings' },
 ];
 
