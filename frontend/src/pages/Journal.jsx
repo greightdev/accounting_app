@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { SquarePen, Trash2, Check, X, ChevronDown, ChevronRight } from "lucide-react";
+import { SquarePen, Trash2, Check, X } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { can } from "../permissions";
 import Tabs from "../components/Tabs";
 import Toolbar from "../components/Toolbar";
 import api from "../api/axios";
@@ -9,8 +11,13 @@ import useToast from "../hooks/useToast";
 import Toast from "../components/Toast";
 
 export default function Journal() {
+    const { role } = useAuth();
+    const canApprove = can(role, "canApprove");
+    const canVoid = can(role, "canVoid");
+    const canEditTx = can(role, "canEditTransactions");
     const [journals, setJournals] = useState([]);
     const [accounts, setAccounts] = useState([]);
+    const [contacts, setContacts] = useState([]);
     const [editingJournal, setEditingJournal] = useState(null);
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState("approved");
@@ -24,6 +31,7 @@ export default function Journal() {
 
     useEffect(() => {
         fetchAccounts();
+        fetchContacts();
     }, []);
 
     const fetchJournals = async () => {
@@ -42,6 +50,15 @@ export default function Journal() {
         try {
             const { data } = await api.get("/accounts/list.php");
             setAccounts(data.data ?? []);
+        } catch (err) {
+            console.log(err);
+        }
+    };
+
+        const fetchContacts = async () => {
+        try {
+            const { data } = await api.get("/contacts/list.php");
+            setContacts(data.data ?? []);
         } catch (err) {
             console.log(err);
         }
@@ -182,13 +199,13 @@ export default function Journal() {
 
     const approvedColumns = [
         ...baseColumns,
-        approvedActions,
+        ...(canVoid ? [approvedActions] : []),
     ];
 
     const draftColumns = [
         ...baseColumns,
-        draftActions,
-        approvalColumn,
+        ...(canEditTx ? [draftActions] : []),
+        ...(canApprove || canVoid ? [approvalColumn] : []),
     ];
 
     const fmt = (n) => Number(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
@@ -201,6 +218,7 @@ export default function Journal() {
                     draftNumber={editingJournal ? editingJournal.ref_number : `JNL-${String(journals.length + 1).padStart(5, "0")}`}
                     initialData={editingJournal}
                     accounts={accounts}
+                    contacts={contacts}
                     onClose={closeForm}
                     onCreate={handleSubmit}
                 />
@@ -214,20 +232,12 @@ export default function Journal() {
                     <Tabs active={tab} onChange={setTab} />
 
                     <div className="bg-white rounded-lg shadow">
-                        {loading ? (
-                            <div className="flex justify-center items-center py-20 text-slate-500">
-                                Loading journal entries...
-                            </div>
-                        ) : journals.length === 0 ? (
-                            <div className="flex justify-center items-center py-20 text-slate-500">
-                                No journal entries found
-                            </div>
-                        ) : (
-                            <DataTable
-                                columns={tab === "approved" ? approvedColumns : draftColumns}
-                                data={filtered}
-                            />
-                        )}
+                        <DataTable
+                            columns={tab === "approved" ? approvedColumns : draftColumns}
+                            data={filtered}
+                            loading={loading}
+                            emptyMessage="No journal entries found"
+                        />
                     </div>
                 </>
             )}
