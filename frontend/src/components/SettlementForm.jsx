@@ -77,7 +77,9 @@ export default function SettlementForm({
     const docTaxable = selectedDoc ? parseFloat(selectedDoc.sub_total ?? 0) : null;
 
     // First receipt against invoice - tds applied
-    const isFirstSettlement = selectedDoc && docOutstanding === docTotal;
+    const isFirstSettlement =
+        selectedDoc && docOutstanding != null && docTotal != null &&
+        Math.abs(docOutstanding - docTotal) < 0.01;
 
     const contactDeductsTds = Boolean(selectedContact?.tds_deducted);
     const tdsApplies = Boolean(selectedDoc) && contactDeductsTds && isFirstSettlement;
