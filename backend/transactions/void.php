@@ -65,6 +65,27 @@ try {
         exit();
     }
 
+    if (in_array($tx['type'], ['RECEIPT', 'PAYMENT', 'JOURNAL'], true)) {
+        $paidCheck = $pdo->prepare("
+            SELECT t2.ref_number
+            FROM tds_entries te
+            JOIN transactions t2 ON t2.id = te.paid_via_tx_id
+            WHERE te.transaction_id = ? AND te.is_paid = TRUE
+            LIMIT 1
+        ");
+        $paidCheck->execute([$id]);
+        $paidVia = $paidCheck->fetch();
+
+        if ($paidVia) {
+            http_response_code(409);
+            echo json_encode([
+                "success" => false,
+                "message" => "This transaction's TDS has already been paid to government via {$paidVia['ref_number']}. Void that TDS payment first, then void this transaction."
+            ]);
+            exit();
+        }
+    }
+
     $pdo->beginTransaction();
 
     // Mark transaction as void
@@ -139,6 +160,16 @@ try {
                 UPDATE tds_entries
                 SET is_paid = FALSE, paid_via_tx_id = NULL
                 WHERE paid_via_tx_id = ?
+            ")->execute([$id]);
+            break;
+
+        case 'JOURNAL':
+            // Unmark any TDS Expense entry linked to this journal. The guard
+            // above already ensures it can't be is_paid = TRUE at this point.
+            $pdo->prepare("
+                UPDATE tds_entries
+                SET is_paid = FALSE, paid_via_tx_id = NULL
+                WHERE transaction_id = ?
             ")->execute([$id]);
             break;
 
