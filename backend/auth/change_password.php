@@ -3,6 +3,7 @@
 require_once '../server.php';
 require_once '../db.php';
 require_once '../includes/auth.php';
+require_once '../includes/audit.php';
 
 requireAuth();
 
@@ -158,6 +159,16 @@ $update = $pdo->prepare("
     WHERE id = ?
 ");
 $update->execute([$newHash, $_SESSION['user_id']]);
+
+logAudit(
+    $pdo,
+    (int) $_SESSION['user_id'],
+    'UPDATE',
+    'users',
+    (int) $_SESSION['user_id'],
+    ['password' => '(unchanged)'],
+    ['password' => '(changed)']
+);
 
 // Force re-login after password change
 destroySession();
