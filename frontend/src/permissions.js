@@ -20,6 +20,7 @@ const PERMISSIONS = {
         canDelete: true,            // contacts, items, accounts, account groups
         canManageUsers: true,
         canViewReports: true,
+        canViewAuditLogs: true,
         canCreateInvoiceOnly: true, // subset of canCreateTransactions, admin has full access anyway
     },
     [ROLES.ACCOUNTANT]: {
@@ -30,6 +31,7 @@ const PERMISSIONS = {
         canDelete: false,
         canManageUsers: false,
         canViewReports: true,
+        canViewAuditLogs: false,
         canCreateInvoiceOnly: true,
     },
     [ROLES.USER]: {
@@ -40,6 +42,7 @@ const PERMISSIONS = {
         canDelete: false,
         canManageUsers: false,
         canViewReports: true,          // view-only, incl. customer statement / ledger reports
+        canViewAuditLogs: false,
         canCreateInvoiceOnly: true,    // the one write action PRD grants this role
     },
 };
@@ -52,6 +55,7 @@ const DEFAULT_PERMS = {
     canDelete: false,
     canManageUsers: false,
     canViewReports: false,
+    canViewAuditLogs: false,
     canCreateInvoiceOnly: false,
 };
 
@@ -79,6 +83,7 @@ export const ROUTE_ROLES = {
     "/journal": [ROLES.ADMIN, ROLES.ACCOUNTANT],
     "/chartofaccounts": [ROLES.ADMIN, ROLES.ACCOUNTANT],
     "/users": [ROLES.ADMIN],
+    "/activitylogs": [ROLES.ADMIN],
     "/reports": [ROLES.ADMIN, ROLES.ACCOUNTANT, ROLES.USER],
     "/settings": [ROLES.ADMIN, ROLES.ACCOUNTANT, ROLES.USER],
 };
