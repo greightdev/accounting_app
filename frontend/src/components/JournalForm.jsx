@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { can } from "../permissions";
 
 const labelCls = "block text-sm font-medium text-gray-700 mb-1.5";
 const inputCls = "w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition";
@@ -16,15 +18,19 @@ function RequiredLabel({ children }) {
 
 const toLocalDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-const emptyLine = (id) => ({ id, accountId: "", debit: "", credit: "", narration: "" });
+const emptyLine = (id) => ({ id, accountId: "", debit: "", credit: "", narration: "", isTdsLine: false });
+
+const TDS_EXPENSE_LINE_ID = "tds-expense-line";
+const TDS_PAYABLE_LINE_ID = "tds-payable-line";
 
 /**
- * Journal Entry form. 
+ * Journal Entry form.
  *
  * @param {string}   draftNumber   display value, or ref_number when editing a draft
  * @param {object}   initialData   existing DRAFT transaction, for edit mode — expects
- *                                 { id, date, notes, lines: [{account_id, debit, credit, narration}] }
+ *                                 { id, date, notes, lines: [{account_id, debit, credit, narration}], tds_context }
  * @param {object[]} accounts      full chart of accounts, e.g. [{id, name, code}]
+ * @param {object[]} contacts      full contacts list, for the TDS Expense customer picker
  * @param {function} onCreate(payload)
  * @param {function} onClose
  */
@@ -32,10 +38,16 @@ export default function JournalForm({
     draftNumber = "DRAFT-1",
     initialData = null,
     accounts = [],
+    contacts = [],
     onCreate,
     onClose,
 }) {
+    const { role } = useAuth();
+    const canApprove = can(role, "canApprove");
     const isEditing = Boolean(initialData);
+
+    const tdsExpenseAccount = accounts.find((a) => a.name === "TDS Expense");
+    const tdsPayableAccount = accounts.find((a) => a.name === "TDS Payable");
 
     const [date, setDate] = useState(initialData?.date ?? toLocalDate(new Date()));
     const [notes, setNotes] = useState(initialData?.notes ?? "");
@@ -47,6 +59,7 @@ export default function JournalForm({
                 debit: Number(l.debit) > 0 ? String(l.debit) : "",
                 credit: Number(l.credit) > 0 ? String(l.credit) : "",
                 narration: l.narration ?? "",
+                isTdsLine: false,
             }));
         }
         return [emptyLine(1), emptyLine(2)];
@@ -54,7 +67,54 @@ export default function JournalForm({
     const [error, setError] = useState("");
     const [submitting, setSubmitting] = useState(false);
 
-    const nextId = () => Math.max(0, ...lines.map((l) => l.id)) + 1;
+    // TDS Expense linkage
+    const [isTdsExpense, setIsTdsExpense] = useState(Boolean(initialData?.tds_context));
+    const [tdsContactId, setTdsContactId] = useState(
+        initialData?.tds_context?.contact_id ? String(initialData.tds_context.contact_id) : ""
+    );
+    const [tdsFiscalYear, setTdsFiscalYear] = useState(initialData?.tds_context?.fiscal_year ?? "");
+    const [tdsAmount, setTdsAmount] = useState(
+        initialData?.tds_context?.tds_amount ? String(initialData.tds_context.tds_amount) : ""
+    );
+
+    // Keep the two auto-populated lines in sync with the checkbox + amount, so they can never drift from what gets written to tds_entries.
+    useEffect(() => {
+        setLines((prev) => {
+            const withoutTdsLines = prev.filter((l) => !l.isTdsLine);
+
+            if (!isTdsExpense || !tdsExpenseAccount || !tdsPayableAccount) {
+                return withoutTdsLines;
+            }
+
+            const amt = tdsAmount || "";
+            return [
+                ...withoutTdsLines,
+                {
+                    id: TDS_EXPENSE_LINE_ID,
+                    accountId: String(tdsExpenseAccount.id),
+                    debit: amt,
+                    credit: "",
+                    narration: "TDS Expense (customer did not deduct)",
+                    isTdsLine: true,
+                },
+                {
+                    id: TDS_PAYABLE_LINE_ID,
+                    accountId: String(tdsPayableAccount.id),
+                    debit: "",
+                    credit: amt,
+                    narration: "TDS Payable to government",
+                    isTdsLine: true,
+                },
+            ];
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isTdsExpense, tdsAmount, tdsExpenseAccount?.id, tdsPayableAccount?.id]);
+
+    const nextId = () => {
+        const numericIds = lines.map((l) => l.id).filter((id) => typeof id === "number");
+        return Math.max(0, ...numericIds) + 1;
+    };
+
 
     const updateLine = (id, field, value) => {
         setLines((prev) =>
@@ -87,6 +147,15 @@ export default function JournalForm({
 
         if (!date) return setError("Date is required.");
 
+        if (isTdsExpense) {
+            if (!tdsExpenseAccount || !tdsPayableAccount) {
+                return setError("TDS Expense / TDS Payable accounts were not found in the Chart of Accounts.");
+            }
+            if (!tdsContactId) return setError("Select the customer this TDS expense relates to.");
+            if (!tdsFiscalYear) return setError("Fiscal year is required for a TDS expense entry.");
+            if (!tdsAmount || parseFloat(tdsAmount) <= 0) return setError("TDS amount must be greater than zero.");
+        }
+
         const filledLines = lines.filter((l) => l.accountId && (parseFloat(l.debit) > 0 || parseFloat(l.credit) > 0));
         if (filledLines.length < 2) return setError("A journal entry needs at least two lines with an account and an amount.");
 
@@ -99,6 +168,20 @@ export default function JournalForm({
             }
         }
 
+        // Backstop: even though the two TDS lines are auto-populated, guard against them ever being hand-edited into mismatching tds_amount.
+        if (isTdsExpense) {
+            const tdsLineDebit = lines.find((l) => l.id === TDS_EXPENSE_LINE_ID);
+            const tdsLineCredit = lines.find((l) => l.id === TDS_PAYABLE_LINE_ID);
+            const expected = parseFloat(tdsAmount) || 0;
+
+            if (
+                Math.round((parseFloat(tdsLineDebit?.debit) || 0) * 100) !== Math.round(expected * 100) ||
+                Math.round((parseFloat(tdsLineCredit?.credit) || 0) * 100) !== Math.round(expected * 100)
+            ) {
+                return setError("The TDS Expense and TDS Payable line amounts must match the TDS amount entered above.");
+            }
+        }
+
         if (!isBalanced) {
             return setError(
                 `Entry is unbalanced. Total debits (Rs. ${fmt(totalDebit)}) must equal total credits (Rs. ${fmt(totalCredit)}).`
@@ -106,6 +189,8 @@ export default function JournalForm({
         }
 
         setSubmitting(true);
+
+        const selectedContact = contacts.find((c) => String(c.id) === tdsContactId);
 
         const payload = {
             ...(isEditing ? { id: initialData.id } : {}),
@@ -118,6 +203,14 @@ export default function JournalForm({
                 narration: l.narration,
             })),
             ...(isEditing ? {} : { status: approve ? "APPROVED" : "DRAFT" }),
+            ...(isTdsExpense ? {
+                tds_context: {
+                    contact_id: parseInt(tdsContactId),
+                    pan: selectedContact?.pan ?? null,
+                    fiscal_year: tdsFiscalYear,
+                    tds_amount: parseFloat(tdsAmount),
+                }
+            } : {}),
         };
 
         try {
@@ -168,6 +261,55 @@ export default function JournalForm({
                     </div>
                 </div>
 
+                {/* TDS Expense Linkage */}
+                <div className="pt-2 border-t border-gray-100">
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                        <input
+                            type="checkbox"
+                            checked={isTdsExpense}
+                            onChange={(e) => setIsTdsExpense(e.target.checked)}
+                        />
+                        This entry recognizes a TDS Expense
+                    </label>
+                    {isTdsExpense && (
+                        <div className="grid grid-cols-3 gap-4 mt-3">
+                            <div>
+                                <RequiredLabel>Customer</RequiredLabel>
+                                <select value={tdsContactId} onChange={(e) => setTdsContactId(e.target.value)} className={inputCls}>
+                                    <option value="">Select customer</option>
+                                    {contacts.filter((c) => c.type === "Customer").map((c) => (
+                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <RequiredLabel>Fiscal Year</RequiredLabel>
+                                <input
+                                    type="text"
+                                    value={tdsFiscalYear}
+                                    onChange={(e) => setTdsFiscalYear(e.target.value)}
+                                    placeholder="e.g. 2081-82"
+                                    className={inputCls}
+                                />
+                            </div>
+                            <div>
+                                <RequiredLabel>TDS Amount</RequiredLabel>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={tdsAmount}
+                                    onChange={(e) => setTdsAmount(e.target.value)}
+                                    className={inputCls}
+                                />
+                            </div>
+                            <p className="col-span-3 text-xs text-gray-400 -mt-1">
+                                The TDS Expense (debit) and TDS Payable (credit) lines below are filled in automatically from this amount.
+                            </p>
+                        </div>
+                    )}
+                </div>
+
                 {/* Lines */}
                 <div className="pt-2">
                     <div className="flex items-center gap-3 mb-4">
@@ -188,12 +330,13 @@ export default function JournalForm({
                             </thead>
                             <tbody>
                                 {lines.map((line) => (
-                                    <tr key={line.id} className="border-t border-gray-100 align-middle">
+                                    <tr key={line.id} className={`border-t border-gray-100 align-middle ${line.isTdsLine ? "bg-amber-50/50" : ""}`}>
                                         <td className="py-2.5 pr-2">
                                             <select
                                                 value={line.accountId}
                                                 onChange={(e) => updateLine(line.id, "accountId", e.target.value)}
-                                                className={cellInputCls}
+                                                disabled={line.isTdsLine}
+                                                className={`${cellInputCls} ${line.isTdsLine ? "opacity-70 cursor-not-allowed" : ""}`}
                                             >
                                                 <option value="">Select account</option>
                                                 {accounts.map((a) => (
@@ -211,7 +354,8 @@ export default function JournalForm({
                                                 placeholder="0.00"
                                                 value={line.debit}
                                                 onChange={(e) => updateLine(line.id, "debit", e.target.value)}
-                                                className={`${cellInputCls} text-right`}
+                                                disabled={line.isTdsLine}
+                                                className={`${cellInputCls} text-right ${line.isTdsLine ? "opacity-70 cursor-not-allowed" : ""}`}
                                             />
                                         </td>
                                         <td className="py-2.5 px-2">
@@ -222,7 +366,8 @@ export default function JournalForm({
                                                 placeholder="0.00"
                                                 value={line.credit}
                                                 onChange={(e) => updateLine(line.id, "credit", e.target.value)}
-                                                className={`${cellInputCls} text-right`}
+                                                disabled={line.isTdsLine}
+                                                className={`${cellInputCls} text-right ${line.isTdsLine ? "opacity-70 cursor-not-allowed" : ""}`}
                                             />
                                         </td>
                                         <td className="py-2.5 px-2">
@@ -231,14 +376,15 @@ export default function JournalForm({
                                                 placeholder="Narration"
                                                 value={line.narration}
                                                 onChange={(e) => updateLine(line.id, "narration", e.target.value)}
-                                                className={cellInputCls}
+                                                disabled={line.isTdsLine}
+                                                className={`${cellInputCls} ${line.isTdsLine ? "opacity-70 cursor-not-allowed" : ""}`}
                                             />
                                         </td>
                                         <td className="py-2.5 pl-1">
                                             <button
                                                 type="button"
                                                 onClick={() => removeLine(line.id)}
-                                                disabled={lines.length <= 2}
+                                                disabled={lines.length <= 2 || line.isTdsLine}
                                                 className="p-1.5 rounded-md text-gray-300 hover:bg-red-50 hover:text-red-500 transition disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-300"
                                             >
                                                 <Trash2 size={14} />
@@ -300,7 +446,7 @@ export default function JournalForm({
                     >
                         Save Draft
                     </button>
-                    {!isEditing && (
+                    {!isEditing && canApprove && (
                         <button
                             type="button"
                             onClick={() => handleSubmit(true)}
