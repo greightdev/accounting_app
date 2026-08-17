@@ -19,11 +19,6 @@ const emptyForm = {
     tax_type: 'VAT13',
 }
 
-const ITEMS_TAB = [
-    { key: 'items', label: 'Items' },
-    { key: 'units', label: 'Units' },
-];
-
 export default function Items() {
     const { role } = useAuth();
     const canDelete = can(role, "canDelete");
@@ -33,9 +28,10 @@ export default function Items() {
     const [search, setSearch] = useState('');
 
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [modalType, setModalType] = useState('selling');
     const [editingItem, setEditingItem] = useState(null);
     const [form, setForm] = useState(emptyForm);
-    const [fieldErrors, setFieldErrors] = useState();
+    const [fieldErrors, setFieldErrors] = useState({});
     const [modalError, setModalError] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const { toast, showToast, hideToast } = useToast();
@@ -57,7 +53,8 @@ export default function Items() {
         }
     };
 
-    const openCreateModal = () => {
+    const openCreateModal = (type) => {
+        setModalType(type);
         setEditingItem(null);
         setForm(emptyForm);
         setModalError('');
@@ -66,6 +63,11 @@ export default function Items() {
     };
 
     const openEditModal = (item) => {
+        const inferredType = 
+            Number(item.purchase_rate) > 0 && Number(item.selling_price) === 0
+                ? 'purchase'
+                : 'selling';
+        setModalType(inferredType);
         setEditingItem(item);
         setForm({
             name: item.name,
@@ -120,9 +122,14 @@ export default function Items() {
             name: validateItemName(form.name),
             unit: validateUnit(form.unit),
             hsn_sac_code: validateHsnSac(form.hsn_sac_code),
-            selling_price: validatePrice(form.selling_price, { label: "Selling price" }),
-            purchase_rate: validatePrice(form.purchase_rate, { label: "Purchase rate" }),
+            // selling_price: validatePrice(form.selling_price, { label: "Selling price" }),
+            // purchase_rate: validatePrice(form.purchase_rate, { label: "Purchase rate" }),
         };
+        if (modalType === 'selling') {
+            errors.selling_price = validatePrice(form.selling_price, { label: "Selling price" });
+        } else {
+            errors.purchase_rate = validatePrice(form.purchase_rate, { label: "Purchase rate" });
+        }
         Object.keys(errors).forEach((key) => { if (!errors[key]) delete errors[key]; });
         return errors;
     }
@@ -139,6 +146,13 @@ export default function Items() {
         setFieldErrors({});
         setSubmitting(true);
     
+        const sellingPrice = modalType === 'selling'
+            ? form.selling_price
+            : (editingItem ? form.selling_price : '0');
+        const purchaseRate = modalType === 'purchase'
+            ? form.purchase_rate
+            : (editingItem ? form.purchase_rate : '0');
+
         try {
             if (editingItem) {
                 await api.put('/items/update.php', {
@@ -146,8 +160,8 @@ export default function Items() {
                     name: form.name,
                     unit: form.unit,
                     hsn_sac_code: form.hsn_sac_code,
-                    selling_price: form.selling_price,
-                    purchase_rate: form.purchase_rate,
+                    selling_price: sellingPrice,
+                    purchase_rate: purchaseRate,
                     tax_type: form.tax_type,
                 });
                 showToast("Item updated successfully.");
@@ -156,8 +170,8 @@ export default function Items() {
                     name: form.name,
                     unit: form.unit,
                     hsn_sac_code: form.hsn_sac_code,
-                    selling_price: form.selling_price,
-                    purchase_rate: form.purchase_rate,
+                    selling_price: sellingPrice,
+                    purchase_rate: purchaseRate,
                     tax_type: form.tax_type,
                 });
                 showToast("Item created successfully.");
@@ -188,9 +202,7 @@ export default function Items() {
     const filteredItems = items.filter((item) => {
         const term = search.toLowerCase();
 
-        return (
-            item.name.toLowerCase().includes(term)
-        );
+        return item.name.toLowerCase().includes(term);
     });
 
     const columns = [
@@ -221,13 +233,20 @@ export default function Items() {
         ) },
     ];
 
+    const modalTitle = editingItem
+        ? 'Edit Item'
+        : (modalType === 'selling' ? 'Add Selling Item' : 'Add Purchase Item');
+
     return (
         <>
             <Toast toast={toast} onClose={hideToast} />
 
             <Toolbar
                 search={{ value: search, onChange: setSearch }}
-                actions={[{ label: '+ New Item', onClick: openCreateModal }]}
+                actions={[
+                    { label: '+ Selling Item', onClick: () => openCreateModal('selling') },
+                    { label: '+ Purchase Item', onClick: () => openCreateModal('purchase') },
+                ]}
             />
 
             <div className="bg-white rounded-lg shadow">
@@ -242,7 +261,7 @@ export default function Items() {
             {/* Modal */}
             {isModalOpen && (
                 <Modal
-                    title={editingItem ? 'Edit Item' : 'Add Item'}
+                    title={modalTitle}
                     subtitle={editingItem ? 'Update item details below.' : 'Enter the item details below.'}
                     error={modalError}
                     onClose={closeModal}
@@ -289,7 +308,8 @@ export default function Items() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    {/* <div className="grid grid-cols-2 gap-4"> */}
+                    {modalType === 'selling' ? (
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1.5">Selling Price</label>
                             <input
@@ -303,6 +323,7 @@ export default function Items() {
                             />
                             {fieldErrors.selling_price && <p className="mt-1 text-xs text-red-500">{fieldErrors.selling_price}</p>}
                         </div>
+                    ) : (
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1.5">Purchase Rate</label>
                             <input
@@ -316,7 +337,7 @@ export default function Items() {
                             />
                             {fieldErrors.purchase_rate && <p className="mt-1 text-xs text-red-500">{fieldErrors.purchase_rate}</p>}
                         </div>
-                    </div>
+                    )}
 
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1.5">Tax Type</label>
