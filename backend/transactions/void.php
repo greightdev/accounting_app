@@ -86,6 +86,28 @@ try {
         }
     }
 
+    // SALES/PURCHASE cannot be voided while a receipt/payment is still allocated against them
+    if (in_array($tx['type'], ['SALES', 'PURCHASE'], true)) {
+        $allocCheck = $pdo->prepare("
+            SELECT t2.ref_number
+            FROM transaction_allocations ta
+            JOIN transactions t2 ON t2.id = ta.settling_transaction_id
+            WHERE ta.settled_transaction_id = ? AND t2.status != 'VOID'
+            LIMIT 1
+        ");
+        $allocCheck->execute([$id]);
+        $settledBy = $allocCheck->fetch();
+
+        if ($settledBy) {
+            http_response_code(409);
+            echo json_encode([
+                "success" => false,
+                "message" => "This transaction has a payment/receipt ({$settledBy['ref_number']}) allocated against it. Void {$settledBy['ref_number']} first, then void this transaction."
+            ]);
+            exit();
+        }
+    }
+
     $pdo->beginTransaction();
 
     // Mark transaction as void
