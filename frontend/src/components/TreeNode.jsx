@@ -27,22 +27,28 @@ export default function TreeNode({
                     </span>
                 </div>
 
-                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                    <button
-                        onClick={() => onEdit(node)}
-                        className="flex items-center justify-center text-slate-500 hover:text-slate-800"
-                        title="Edit"
-                    >
-                        <Pencil size={14} />
-                    </button>
-                    <button
-                        onClick={() => onDelete(node.id)}
-                        className="flex items-center justify-center text-slate-500 hover:text-slate-800"
-                        title="Delete"
-                    >
-                        <Trash2 size={14} />
-                    </button>
-                </div>
+                {(onEdit || onDelete) && (
+                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                        {onEdit && (
+                            <button
+                                onClick={() => onEdit(node)}
+                                className="flex items-center justify-center text-slate-500 hover:text-slate-800"
+                                title="Edit"
+                            >
+                                <Pencil size={14} />
+                            </button>
+                        )}
+                        {onDelete && (
+                            <button
+                                onClick={() => onDelete(node.id)}
+                                className="flex items-center justify-center text-slate-500 hover:text-slate-800"
+                                title="Delete"
+                            >
+                                <Trash2 size={14} />
+                            </button>
+                        )}
+                    </div>
+                )}
             </div>
         );
     }
@@ -71,22 +77,26 @@ export default function TreeNode({
                     </span>
                 </div>
 
-                {onEditGroup && onDeleteGroup && (
+                {(onEditGroup || onDeleteGroup) && (
                     <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                        <button
-                            onClick={() => onEditGroup(node)}
-                            className="flex items-center justify-center text-slate-500 hover:text-slate-800"
-                            title="Edit Group"
-                        >
-                            <Pencil size={14} />
-                        </button>
-                        <button
-                            onClick={() => onDeleteGroup(node.id)}
-                            className="flex items-center justify-center text-slate-500 hover:text-slate-800"
-                            title="Delete Group"
-                        >
-                            <Trash2 size={14} />
-                        </button>
+                        {onEditGroup && (
+                            <button
+                                onClick={() => onEditGroup(node)}
+                                className="flex items-center justify-center text-slate-500 hover:text-slate-800"
+                                title="Edit Group"
+                            >
+                                <Pencil size={14} />
+                            </button>
+                        )}
+                        {onDeleteGroup && (
+                            <button
+                                onClick={() => onDeleteGroup(node.id)}
+                                className="flex items-center justify-center text-slate-500 hover:text-slate-800"
+                                title="Delete Group"
+                            >
+                                <Trash2 size={14} />
+                            </button>
+                        )}
                     </div>
                 )}
             </div>
