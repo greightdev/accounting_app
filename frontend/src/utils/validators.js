@@ -129,6 +129,84 @@ export function validatePassword(value, { required = true } = {}) {
     return "";
 }
 
+// Transactional forms (Invoices, Bills, Receipts, Payments, Journal, Deposits, Withdrawals, PayTds)
+export function validateRequiredDate(value, { label = "Date" } = {}) {
+    if (!value) return `${label} is required.`;
+    if (Number.isNaN(new Date(value).getTime())) return `${label} is not a valid date.`;
+    return "";
+}
+
+// Only complains when both dates are present and out of order — doesn't duplicate the "required" check.
+export function validateDateNotBefore(value, compareValue, { label = "Due date", compareLabel = "date" } = {}) {
+    if (!value || !compareValue) return "";
+    if (new Date(value).getTime() < new Date(compareValue).getTime()) {
+        return `${label} cannot be before the ${compareLabel}.`;
+    }
+    return "";
+}
+
+export function validateRequiredSelect(value, { label = "This field" } = {}) {
+    if (value === "" || value === null || value === undefined) return `${label} is required.`;
+    return "";
+}
+
+export function validatePositiveNumber(value, { label = "Value", allowZero = false } = {}) {
+    if (value === "" || value === null || value === undefined) return `${label} is required.`;
+    const num = Number(value);
+    if (Number.isNaN(num)) return `${label} must be a valid number.`;
+    if (allowZero ? num < 0 : num <= 0) {
+        return allowZero ? `${label} cannot be negative.` : `${label} must be greater than zero.`;
+    }
+    return "";
+}
+
+export function validateLineItems(rows, {
+    itemField = "itemId",
+    qtyField = "quantity",
+    rateField = "rate",
+    itemLabel = "item",
+} = {}) {
+    const isBlank = (row) => !row[itemField] && !row[qtyField] && !row[rateField];
+    const cleaned = rows.filter((row) => !isBlank(row));
+
+    if (cleaned.length === 0) {
+        return { rows: cleaned, error: "Add at least one line item.", errorRowId: null };
+    }
+
+    for (let i = 0; i < cleaned.length; i++) {
+        const row = cleaned[i];
+        const rowNum = i + 1;
+
+        if (!row[itemField]) {
+            return { rows: cleaned, error: `Line ${rowNum}: select an ${itemLabel}.`, errorRowId: row.id };
+        }
+
+        const qty = Number(row[qtyField]);
+        if (row[qtyField] === "" || Number.isNaN(qty) || qty <= 0) {
+            return { rows: cleaned, error: `Line ${rowNum}: quantity must be greater than zero.`, errorRowId: row.id };
+        }
+
+        const rate = Number(row[rateField]);
+        if (row[rateField] === "" || Number.isNaN(rate) || rate < 0) {
+            return { rows: cleaned, error: `Line ${rowNum}: rate cannot be negative.`, errorRowId: row.id };
+        }
+    }
+
+    return { rows: cleaned, error: null, errorRowId: null };
+}
+
+// Fiscal year (Nepali BS format, e.g. "2081-82")
+export const FISCAL_YEAR_REGEX = /^\d{4}-\d{2}$/;
+
+export function validateFiscalYear(value, { required = true } = {}) {
+    const v = (value ?? "").trim();
+    if (!v) return required ? "Fiscal year is required." : "";
+    if (!FISCAL_YEAR_REGEX.test(v)) {
+        return "Fiscal year must be in the format YYYY-YY, e.g. 2081-82.";
+    }
+    return "";
+}
+
 // Accounts
 export function validateGenericName(value, { required = true, label = "Name", maxLen = 150 } = {}) {
     const v = (value ?? "").trim();

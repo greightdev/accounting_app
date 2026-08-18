@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
+import { validateRequiredDate, validateRequiredSelect, validatePositiveNumber, validateFiscalYear } from "../utils/validators";
 
 const labelCls = "block text-sm font-medium text-gray-700 mb-1.5";
 const inputCls = "w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition";
@@ -51,8 +52,13 @@ export default function SettlementForm({
     const [amountReceived, setAmountReceived] = useState("");
     const [fiscalYearVal, setFiscalYearVal] = useState(fiscalYear);
     const [notes, setNotes] = useState("");
-    const [error, setError] = useState("");
+    const [formError, setFormError] = useState("");
+    const [fieldErrors, setFieldErrors] = useState({});
     const [submitting, setSubmitting] = useState(false);
+
+    const clearFieldError = (field) => {
+        if (fieldErrors[field]) setFieldErrors((prev) => ({ ...prev, [field]: "" }));
+    };
 
     // Filter contacts by type. Contacts are strictly Customer / Vendor / Employee —
     const filteredContacts = contacts.filter((c) =>
@@ -102,22 +108,49 @@ export default function SettlementForm({
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError("");
+        setFormError("");
 
-        if (!contactId) return setError(isReceipt ? "Customer is required." : "Vendor is required.");
-        if (!date) return setError("Date is required.");
-        if (!bankAccountId) return setError("Bank / Cash account is required.");
-        if (!amountReceived || parseFloat(amountReceived) <= 0) {
-            return setError("Amount must be greater than zero.");
+        // if (!contactId) return setError(isReceipt ? "Customer is required." : "Vendor is required.");
+        // if (!date) return setError("Date is required.");
+        // if (!bankAccountId) return setError("Bank / Cash account is required.");
+        // if (!amountReceived || parseFloat(amountReceived) <= 0) {
+        //     return setError("Amount must be greater than zero.");
+        // }
+        // if (tdsApplies && !fiscalYearVal) {
+        //     return setError("Fiscal year is required for this TDS entry.");
+        // }
+        const errors = {};
+
+        const contactErr = validateRequiredSelect(contactId, { label: isReceipt ? "Customer" : "Vendor" });
+        if (contactErr) errors.contact = contactErr;
+
+        const dateErr = validateRequiredDate(date, { label: "Date" });
+        if (dateErr) errors.date = dateErr;
+
+        const bankErr = validateRequiredSelect(bankAccountId, { label: isReceipt ? "Received into account" : "Paid from account" });
+        if (bankErr) errors.bankAccount = bankErr;
+
+        const amountErr = validatePositiveNumber(amountReceived, { label: isReceipt ? "Amount received" : "Amount paid" });
+        if (amountErr) errors.amount = amountErr;
+
+        if (tdsApplies) {
+            const fyErr = validateFiscalYear(fiscalYearVal);
+            if (fyErr) errors.fiscalYear = fyErr;
+        // if (exceedsOutstanding) {
+        //     return setError(
         }
-        if (tdsApplies && !fiscalYearVal) {
-            return setError("Fiscal year is required for this TDS entry.");
-        }
-        if (exceedsOutstanding) {
-            return setError(
+        
+        // Cross-field business rule: can't clear more than what's outstanding on the document
+        if (!amountErr && exceedsOutstanding) {
+            errors.amount =
                 `Total clearing (Rs. ${totalCleared.toLocaleString()}) exceeds the outstanding balance ` +
-                `(Rs. ${docOutstanding.toLocaleString()}) on ${selectedDoc.ref_number}.`
-            );
+                `(Rs. ${docOutstanding.toLocaleString()}) on ${selectedDoc.ref_number}.`;
+        }
+
+        setFieldErrors(errors);
+
+        if (Object.keys(errors).length > 0) {
+            return;
         }
 
         setSubmitting(true);
@@ -145,7 +178,7 @@ export default function SettlementForm({
         try {
             await onCreate(payload);
         } catch (err) {
-            setError(err?.message ?? "Something went wrong.");
+            setFormError(err?.message ?? "Something went wrong.");
             setSubmitting(false);
         }
     };
@@ -168,9 +201,9 @@ export default function SettlementForm({
             </div>
 
             <form onSubmit={handleSubmit} className="px-7 py-6 space-y-6">
-                {error && (
+                {formError && (
                     <div className="px-4 py-2.5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm">
-                        {error}
+                        {formError}
                     </div>
                 )}
 
@@ -180,9 +213,13 @@ export default function SettlementForm({
                         <input
                             type="date"
                             value={date}
-                            onChange={(e) => setDate(e.target.value)}
-                            className={inputCls}
+                            onChange={(e) => {
+                                setDate(e.target.value);
+                                clearFieldError("date");
+                            }}
+                            className={`${inputCls} ${fieldErrors.date ? "border-red-400" : ""}`}
                         />
+                        {fieldErrors.date && <p className="mt-1 text-xs text-red-500">{fieldErrors.date}</p>}
                     </div>
                 </div>
 
@@ -192,14 +229,18 @@ export default function SettlementForm({
                         <RequiredLabel>{isReceipt ? "Customer" : "Vendor"}</RequiredLabel>
                         <select
                             value={contactId}
-                            onChange={(e) => setContactId(e.target.value)}
-                            className={inputCls}
+                            onChange={(e) => {
+                                setContactId(e.target.value);
+                                clearFieldError("contact");
+                            }}
+                            className={`${inputCls} ${fieldErrors.contact ? "border-red-400" : ""}`}
                         >
                             <option value="">Select {isReceipt ? "customer" : "vendor"}</option>
                             {filteredContacts.map((c) => (
                                 <option key={c.id} value={c.id}>{c.name}</option>
                             ))}
                         </select>
+                        {fieldErrors.contact && <p className="mt-1 text-xs text-red-500">{fieldErrors.contact}</p>}
                         {selectedContact && contactDeductsTds && (
                             <p className="text-xs text-gray-400 mt-1">
                                 {/* Deducts TDS — applied automatically on their first settlement per invoice/bill. */}
@@ -248,14 +289,18 @@ export default function SettlementForm({
                         <RequiredLabel>{isReceipt ? "Received Into" : "Paid From"}</RequiredLabel>
                         <select
                             value={bankAccountId}
-                            onChange={(e) => setBankAccountId(e.target.value)}
-                            className={inputCls}
+                            onChange={(e) => {
+                                setBankAccountId(e.target.value);
+                                clearFieldError("bankAccount");
+                            }}
+                            className={`${inputCls} ${fieldErrors.bankAccount ? "border-red-400" : ""}`}
                         >
                             <option value="">Select account</option>
                             {bankAccounts.map((ba) => (
                                 <option key={ba.id} value={ba.id}>{ba.name}</option>
                             ))}
                         </select>
+                        {fieldErrors.bankAccount && <p className="mt-1 text-xs text-red-500">{fieldErrors.bankAccount}</p>}
                     </div>
 
                     {/* Amount */}
@@ -266,41 +311,42 @@ export default function SettlementForm({
                             min="0"
                             step="0.01"
                             value={amountReceived}
-                            onChange={(e) => setAmountReceived(e.target.value)}
+                            onChange={(e) => {
+                                setAmountReceived(e.target.value);
+                                clearFieldError("amount");
+                            }}
                             placeholder="0.00"
-                            className={inputCls}
+                            className={`${inputCls} ${fieldErrors.amount ? "border-red-400" : ""}`}
                         />
-                        {selectedDoc && parseFloat(amountReceived) > 0 && (
-                            <p className={`text-xs mt-1 ${exceedsOutstanding ? "text-red-600 font-medium" : "text-gray-500"}`}>
-                                Total clearing: Rs. {fmt(totalCleared)}
-                                {exceedsOutstanding ? " — exceeds outstanding amount" : ""}
-                            </p>
+                        {fieldErrors.amount ? (
+                            <p className="mt-1 text-xs text-red-500">{fieldErrors.amount}</p>
+                        ) : (
+                            selectedDoc && parseFloat(amountReceived) > 0 && (
+                                <p className={`text-xs mt-1 ${exceedsOutstanding ? "text-red-600 font-medium" : "text-gray-500"}`}>
+                                    Total clearing: Rs. {fmt(totalCleared)}
+                                    {exceedsOutstanding ? " — exceeds outstanding amount" : ""}
+                                </p>
+                            )
                         )}
                     </div>
 
                     {tdsApplies && (
-                        <div className="grid grid-cols-3 gap-4">
-                            <div>
-                                <RequiredLabel>Fiscal Year</RequiredLabel>
-                                <input
-                                    type="text"
-                                    value={fiscalYearVal}
-                                    onChange={(e) => setFiscalYearVal(e.target.value)}
-                                    placeholder="e.g. 2081-82"
-                                    className={inputCls}
-                                />
-                            </div>
+                        <div>
+                            <RequiredLabel>Fiscal Year</RequiredLabel>
+                            <input
+                                type="text"
+                                value={fiscalYearVal}
+                                onChange={(e) => {
+                                    setFiscalYearVal(e.target.value);
+                                    clearFieldError("fiscalYear");
+                                }}
+                                placeholder="e.g. 2081-82"
+                                className={`${inputCls} ${fieldErrors.fiscalYear ? "border-red-400" : ""}`}
+                            />
+                            {fieldErrors.fiscalYear && <p className="mt-1 text-xs text-red-500">{fieldErrors.fiscalYear}</p>}
                         </div>
                     )}
                 </div>
-
-                {tdsApplies && (
-                    <p className="text-xs text-gray-400 -mt-2">
-                        {/* TDS of Rs. {fmt(tdsAmount)} (1.5% of taxable amount) will be recorded automatically with this{" "}
-                        {isReceipt ? "receipt" : "payment"}, since {selectedContact.name} deducts TDS and nothing has been settled on this{" "}
-                        {isReceipt ? "invoice" : "bill"} yet. */}
-                    </p>
-                )}
 
                 {/* Notes + Total summary */}
                 <div className="grid grid-cols-2 gap-10 pt-2">
@@ -346,24 +392,6 @@ export default function SettlementForm({
                         )}
                     </div>
 
-                    {/* {parseFloat(amountReceived) > 0 && (
-                        <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
-                            <div className="flex justify-between text-gray-600">
-                                <span>{isReceipt ? "Cash / Bank received" : "Cash / Bank paid"}</span>
-                                <span>Rs. {parseFloat(amountReceived || 0).toLocaleString()}</span>
-                            </div>
-                            {tdsDeducted && tdsAmount && (
-                                <div className="flex justify-between text-gray-600">
-                                    <span>TDS {isReceipt ? "deducted by customer" : "deducted from vendor"}</span>
-                                    <span>Rs. {parseFloat(tdsAmount || 0).toLocaleString()}</span>
-                                </div>
-                            )}
-                            <div className="flex justify-between font-semibold text-gray-900 pt-2 border-t border-gray-200">
-                                <span>Total {isReceipt ? "receivable cleared" : "payable cleared"}</span>
-                                <span>Rs. {totalCleared.toLocaleString()}</span>
-                            </div>
-                        </div>
-                    )} */}
                 </div>
 
                 {/* Actions */}

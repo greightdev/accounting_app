@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { can } from "../permissions";
+import { validateRequiredDate, validateRequiredSelect, validatePositiveNumber } from "../utils/validators";
 
 const labelCls = "block text-sm font-medium text-gray-700 mb-1.5";
 const inputCls = "w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition";
@@ -55,8 +56,13 @@ export default function BankTransferForm({
     const [contraAccountId, setContraAccountId] = useState(initialData?.contra_account_id != null ? String(initialData.contra_account_id) : "");
     const [amount, setAmount] = useState(initialData?.total_amount != null ? String(initialData.total_amount) : "");
     const [notes, setNotes] = useState(initialData?.notes ?? "");
-    const [error, setError] = useState("");
+    const [formError, setFormError] = useState("");
+    const [fieldErrors, setFieldErrors] = useState({});
     const [submitting, setSubmitting] = useState(false);
+
+    const clearFieldError = (field) => {
+        if (fieldErrors[field]) setFieldErrors((prev) => ({ ...prev, [field]: "" }));
+    };
 
     // Fetch contra accounts for whatever bank account is selected 
     useEffect(() => {
@@ -67,25 +73,43 @@ export default function BankTransferForm({
     const handleBankAccountChange = (value) => {
         setBankAccountId(value);
         setContraAccountId(""); // previous selection may no longer be valid
+        clearFieldError("bankAccount");
+        clearFieldError("contraAccount");
         onBankAccountChange?.(value || null);
     };
 
     const fmt = (n) => (n || n === 0 ? Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "-");
 
     const handleSubmit = async (approve) => {
-        setError("");
+        setFormError("");
 
-        if (!date) return setError("Date is required.");
-        if (!bankAccountId) return setError("Bank account is required.");
-        if (!contraAccountId) return setError(isDeposit ? "Source account is required." : "Destination account is required.");
-        
+        const errors = {};
+
+        const dateErr = validateRequiredDate(date, { label: "Date" });
+        if (dateErr) errors.date = dateErr;
+
+        const bankErr = validateRequiredSelect(bankAccountId, { label: "Bank account" });
+        if (bankErr) errors.bankAccount = bankErr;
+
+        const contraLabel = isDeposit ? "Source account" : "Destination account";
+        const contraErr = validateRequiredSelect(contraAccountId, { label: contraLabel });
+        if (contraErr) errors.contraAccount = contraErr;
+
         const selectedBankAccount = bankAccounts.find((ba) => String(ba.id) === String(bankAccountId));
         const bankLedgerAccountId = selectedBankAccount?.ledger_account_id;
 
-        if (bankLedgerAccountId != null && String(bankLedgerAccountId) === String(contraAccountId)) {
-            return setError("Source and destination accounts must be different.");
+        if (!contraErr && bankLedgerAccountId != null && String(bankLedgerAccountId) === String(contraAccountId)) {
+            errors.contraAccount = "Source and destination accounts must be different.";
         }
-        if (!amount || parseFloat(amount) <= 0) return setError("Amount must be greater than zero.");
+
+        const amountErr = validatePositiveNumber(amount, { label: "Amount" });
+        if (amountErr) errors.amount = amountErr;
+
+        setFieldErrors(errors);
+
+        if (Object.keys(errors).length > 0) {
+            return;
+        }
 
         setSubmitting(true);
 
@@ -102,7 +126,7 @@ export default function BankTransferForm({
         try {
             await onCreate(payload);
         } catch (err) {
-            setError(err?.message ?? "Something went wrong.");
+            setFormError(err?.message ?? "Something went wrong.");
             setSubmitting(false);
         }
     };
@@ -125,9 +149,9 @@ export default function BankTransferForm({
             </div>
 
             <div className="px-7 py-6 space-y-6">
-                {error && (
+                {formError && (
                     <div className="px-4 py-2.5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm">
-                        {error}
+                        {formError}
                     </div>
                 )}
 
@@ -143,9 +167,13 @@ export default function BankTransferForm({
                         <input
                             type="date"
                             value={date}
-                            onChange={(e) => setDate(e.target.value)}
-                            className={inputCls}
+                            onChange={(e) => {
+                                setDate(e.target.value);
+                                clearFieldError("date");
+                            }}
+                            className={`${inputCls} ${fieldErrors.date ? "border-red-400" : ""}`}
                         />
+                        {fieldErrors.date && <p className="mt-1 text-xs text-red-500">{fieldErrors.date}</p>}
                     </div>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
@@ -154,28 +182,33 @@ export default function BankTransferForm({
                         <select
                             value={bankAccountId}
                             onChange={(e) => handleBankAccountChange(e.target.value)}
-                            className={inputCls}
+                            className={`${inputCls} ${fieldErrors.bankAccount ? "border-red-400" : ""}`}
                         >
                             <option value="">Select bank account</option>
                             {bankAccounts.map((ba) => (
                                 <option key={ba.id} value={ba.id}>{ba.name}</option>
                             ))}
                         </select>
+                        {fieldErrors.bankAccount && <p className="mt-1 text-xs text-red-500">{fieldErrors.bankAccount}</p>}
                     </div>
 
                     <div>
                         <RequiredLabel>{isDeposit ? "From (Source)" : "To (Destination)"}</RequiredLabel>
                         <select
                             value={contraAccountId}
-                            onChange={(e) => setContraAccountId(e.target.value)}
+                            onChange={(e) => {
+                                setContraAccountId(e.target.value);
+                                clearFieldError("contraAccount");
+                            }}
                             disabled={!bankAccountId}
-                            className={`${inputCls} ${!bankAccountId ? "opacity-50 cursor-not-allowed" : ""}`}
+                            className={`${inputCls} ${!bankAccountId ? "opacity-50 cursor-not-allowed" : ""} ${fieldErrors.contraAccount ? "border-red-400" : ""}`}
                         >
                             <option value="">{bankAccountId ? "Select account" : "Select bank account first"}</option>
                             {contraAccounts.map((a) => (
                                 <option key={a.id} value={a.id}>{a.name}</option>
                             ))}
                         </select>
+                        {fieldErrors.contraAccount && <p className="mt-1 text-xs text-red-500">{fieldErrors.contraAccount}</p>}
                     </div>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
@@ -186,10 +219,14 @@ export default function BankTransferForm({
                             min="0"
                             step="0.01"
                             value={amount}
-                            onChange={(e) => setAmount(e.target.value)}
+                            onChange={(e) => {
+                                setAmount(e.target.value);
+                                clearFieldError("amount");
+                            }}
                             placeholder="0.00"
-                            className={inputCls}
+                            className={`${inputCls} ${fieldErrors.amount ? "border-red-400" : ""}`}
                         />
+                        {fieldErrors.amount && <p className="mt-1 text-xs text-red-500">{fieldErrors.amount}</p>}
                     </div>
                 </div>
 

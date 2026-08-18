@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { X, ChevronRight, ChevronDown, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { can } from "../permissions";
+import { validateRequiredDate, validateDateNotBefore, validateRequiredSelect, validateLineItems } from "../utils/validators";
 
 // TransactionForm — generic layout for any line-item document:
 // Sales Invoice, Purchase Bill, etc.
@@ -87,6 +88,9 @@ export default function TransactionForm({
     const [notes, setNotes] = useState(initialData?.notes ?? "");
     const [refNumber, setRefNumber] = useState(initialData?.ref_number ?? "");
     const [expandedRows, setExpandedRows] = useState({});
+    const [fieldErrors, setFieldErrors] = useState({});
+    const [lineItemsError, setLineItemsError] = useState("");
+    const [errorRowId, setErrorRowId] = useState(null);
     const [lineItems, setLineItems] = useState(() => {
         if (initialData?.line_items?.length) {
             const rows = initialData.line_items.map((li, idx) => ({
@@ -122,6 +126,10 @@ export default function TransactionForm({
                 return next;
             })
         );
+        if (lineItemsError) {
+            setLineItemsError("");
+            setErrorRowId(null);
+        }
     };
 
     const addRow = () => {
@@ -170,6 +178,31 @@ export default function TransactionForm({
     const employees = contacts.filter((c) => c.type === "Employee");
 
     const handleSubmit = (approve) => {
+        const errors = {};
+
+        const dateErr = validateRequiredDate(date, { label: "Date" });
+        if (dateErr) errors.date = dateErr;
+
+        if (showDueDate) {
+            const dueDateErr =
+                validateRequiredDate(dueDate, { label: "Due date" }) ||
+                validateDateNotBefore(dueDate, date, { label: "Due date", compareLabel: "invoice date" });
+            if (dueDateErr) errors.dueDate = dueDateErr;
+        }
+
+        const contactErr = validateRequiredSelect(contact, { label: "Contact" });
+        if (contactErr) errors.contact = contactErr;
+
+        const { rows: cleanedLineItems, error: lineErr, errorRowId: badRowId } = validateLineItems(lineItems);
+
+        setFieldErrors(errors);
+        setLineItemsError(lineErr || "");
+        setErrorRowId(badRowId);
+
+        if (Object.keys(errors).length > 0 || lineErr) {
+            return;
+        }
+
         const payload = {
             ...(initialData ? { id: initialData.id } : {}),
             date,
@@ -179,7 +212,7 @@ export default function TransactionForm({
             contact_id: contact,
             ...(showSalesman ? { salesman_id: salesman } : {}),
             notes,
-            line_items: lineItems.map((row) => {
+            line_items: cleanedLineItems.map((row) => {
                 const c = computeRow(row);
                 return {
                     item_id: row.itemId,
@@ -247,9 +280,13 @@ export default function TransactionForm({
                         <input
                             type="date"
                             value={date}
-                            onChange={(e) => setDate(e.target.value)}
-                            className={inputCls}
+                            onChange={(e) => {
+                                setDate(e.target.value);
+                                if (fieldErrors.date) setFieldErrors((prev) => ({ ...prev, date: "" }));
+                            }}
+                            className={`${inputCls} ${fieldErrors.date ? "border-red-400" : ""}`}
                         />
+                        {fieldErrors.date && <p className="mt-1 text-xs text-red-500">{fieldErrors.date}</p>}
                     </div>
                     {showDueDate && (
                         <div>
@@ -257,9 +294,13 @@ export default function TransactionForm({
                             <input
                                 type="date"
                                 value={dueDate}
-                                onChange={(e) => setDueDate(e.target.value)}
-                                className={inputCls}
+                                onChange={(e) => {
+                                    setDueDate(e.target.value);
+                                    if (fieldErrors.dueDate) setFieldErrors((prev) => ({ ...prev, dueDate: "" }));
+                                }}
+                                className={`${inputCls} ${fieldErrors.dueDate ? "border-red-400" : ""}`}
                             />
+                            {fieldErrors.dueDate && <p className="mt-1 text-xs text-red-500">{fieldErrors.dueDate}</p>}
                         </div>
                     )}
                 </div>
@@ -300,7 +341,14 @@ export default function TransactionForm({
                 <div className="grid grid-cols-3 gap-4">
                     <div>
                         <RequiredLabel>Contact</RequiredLabel>
-                        <select value={contact} onChange={(e) => setContact(e.target.value)} className={inputCls}>
+                        <select
+                            value={contact}
+                            onChange={(e) => {
+                                setContact(e.target.value);
+                                if (fieldErrors.contact) setFieldErrors((prev) => ({ ...prev, contact: "" }));
+                            }}
+                            className={`${inputCls} ${fieldErrors.contact ? "border-red-400" : ""}`}
+                        >
                             <option value="">Contact</option>
                             {filteredContacts.map((c) => (
                                 <option key={c.id} value={c.id}>
@@ -308,6 +356,7 @@ export default function TransactionForm({
                                 </option>
                             ))}
                         </select>
+                        {fieldErrors.contact && <p className="mt-1 text-xs text-red-500">{fieldErrors.contact}</p>}
                     </div>
                 </div>
 
@@ -317,6 +366,12 @@ export default function TransactionForm({
                         <h3 className="text-xs font-bold tracking-wide text-gray-500 uppercase">Line Items</h3>
                         <div className="flex-1 border-t border-gray-100" />
                     </div>
+
+                    {lineItemsError && (
+                        <div className="mb-3 px-4 py-2.5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm">
+                            {lineItemsError}
+                        </div>
+                    )}
 
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
@@ -337,7 +392,14 @@ export default function TransactionForm({
                                 {lineItems.map((row, idx) => {
                                     const c = computeRow(row);
                                     return (
-                                        <tr key={row.id} className="border-t border-gray-100 align-middle">
+                                        <tr
+                                            key={row.id}
+                                            className={`border-t align-middle ${
+                                                errorRowId === row.id
+                                                    ? "border-red-200 bg-red-50/50"
+                                                    : "border-gray-100"
+                                            }`}
+                                        >
                                             <td className="py-2.5">
                                                 <button
                                                     type="button"
