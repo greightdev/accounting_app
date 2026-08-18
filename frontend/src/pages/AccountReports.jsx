@@ -47,7 +47,7 @@ const REPORT_GROUPS = [
             { key: "customer-balance", label: "Customer Balance", icon: Users, path: "/reports/customer-balance" },
             { key: "receivables-ageing", label: "Receivables Ageing", icon: Clock, path: "/reports/receivables-ageing" },
             { key: "customer-transactions", label: "Customer Transactions", icon: Users, path: "/reports/customer-transactions" },
-            { key: "contact-ledger-customer", label: "Contact Ledger", icon: BookOpen, path: "/reports/contact-ledger?type=customer" },
+            { key: "contact-ledger-customer", label: "Contact Ledger", icon: BookOpen, path: "/reports/contact-ledger" },
             { key: "transaction-summary", label: "Transaction Summary", icon: BookOpen, path: "/reports/transaction-summary" },
         ],
     },

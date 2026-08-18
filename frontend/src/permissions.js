@@ -100,5 +100,6 @@ export function isRouteAllowed(role, pathname) {
 
 /** First route a role should land on after login, for redirects. */
 export function homeRouteFor(role) {
-    return role === ROLES.USER ? "/sales/invoices" : "/dashboard";
+    // return role === ROLES.USER ? "/sales/invoices" : "/dashboard";
+    return "/dashboard";
 }

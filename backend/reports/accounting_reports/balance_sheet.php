@@ -134,7 +134,7 @@ try {
             "as_of" => $asOf,
             "total_assets" => $totalAssets,
             "total_liabilities_and_equity" => $totalLiabilitiesAndEquity,
-            "is_balanced" => round($totalAssets, 2) === round($totalLiabilitiesAndEquity, 2),
+            "is_balanced" => abs($totalAssets - $totalLiabilitiesAndEquity) < 0.01,
         ],
     ]);
 
