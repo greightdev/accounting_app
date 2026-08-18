@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
-import api from "../api/axios";
+import api, { setUnauthorizedHandler} from "../api/axios";
 
 const AuthContext = createContext(null);
 
@@ -24,6 +24,11 @@ export function AuthProvider({ children }) {
         })();
 
         return () => { cancelled = true; };
+    }, []);
+
+    useEffect(() => {
+        setUnauthorizedHandler(() => setUser(null));
+        return () => setUnauthorizedHandler(null);
     }, []);
 
     const login = useCallback((userObj) => {

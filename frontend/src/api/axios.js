@@ -8,4 +8,20 @@ const api = axios.create({
     },
 });
 
+let onUnauthorized = null;
+
+export function setUnauthorizedHandler(fn) {
+    onUnauthorized = fn;
+}
+
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            onUnauthorized?.();
+        }
+        return Promise.reject(error);
+    }
+);
+
 export default api;
