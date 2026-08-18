@@ -21,8 +21,6 @@ $action = $_GET['action'] ?? null;
 $tableName = $_GET['table_name'] ?? null;
 $userId = $_GET['user_id'] ?? null;
 $search = trim($_GET['search'] ?? '');
-$limit = isset($_GET['limit']) ? min((int)$_GET['limit'], 200) : 50;
-$offset = isset($_GET['offset']) ? max((int)$_GET['offset'], 0) : 0;
  
 $validActions = ['CREATE', 'UPDATE', 'DELETE', 'VOID'];
 
@@ -60,17 +58,6 @@ try {
  
     $whereSql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
  
-    // Total count for pagination
-    $countStmt = $pdo->prepare("
-        SELECT COUNT(*) AS cnt
-        FROM audit_logs al
-        LEFT JOIN users u ON u.id = al.user_id
-        $whereSql
-    ");
-    $countStmt->execute($params);
-    $total = (int) $countStmt->fetch()['cnt'];
- 
-    // Page of results
     $stmt = $pdo->prepare("
         SELECT
             al.id,
@@ -87,7 +74,6 @@ try {
         LEFT JOIN users u ON u.id = al.user_id
         $whereSql
         ORDER BY al.created_at DESC, al.id DESC
-        LIMIT $limit OFFSET $offset
     ");
     $stmt->execute($params);
     $rows = $stmt->fetchAll();
@@ -112,11 +98,6 @@ try {
         "success" => true,
         "message" => "Activity log fetched successfully.",
         "data" => $logs,
-        "meta" => [
-            "total" => $total,
-            "limit" => $limit,
-            "offset" => $offset,
-        ],
     ]);
 } catch (PDOException $e) {
     error_log("Audit log list error: " . $e->getMessage());

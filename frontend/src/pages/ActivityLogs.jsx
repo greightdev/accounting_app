@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
-import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { X } from "lucide-react";
+import Toolbar from "../components/Toolbar";
 import DataTable from "../components/DataTable";
 import api from "../api/axios";
 
@@ -20,8 +21,6 @@ const ACTION_STYLES = {
     DELETE: "bg-red-50 text-red-500",
     VOID: "bg-amber-50 text-amber-600",
 };
-
-const PAGE_SIZE = 50;
 
 function tableLabel(name) {
     return TABLE_LABELS[name] ?? name;
@@ -132,7 +131,6 @@ function DetailModal({ log, onClose }) {
 
 export default function ActivityLogs() {
     const [logs, setLogs] = useState([]);
-    const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
     const [selectedLog, setSelectedLog] = useState(null);
 
@@ -141,15 +139,11 @@ export default function ActivityLogs() {
     const [action, setAction] = useState("");
     const [tableName, setTableName] = useState("");
     const [search, setSearch] = useState("");
-    const [page, setPage] = useState(0);
 
     const fetchLogs = useCallback(async () => {
         setLoading(true);
         try {
-            const params = {
-                limit: PAGE_SIZE,
-                offset: page * PAGE_SIZE,
-            };
+            const params = {};
             if (dateFrom) params.date_from = dateFrom;
             if (dateTo) params.date_to = dateTo;
             if (action) params.action = action;
@@ -158,23 +152,16 @@ export default function ActivityLogs() {
 
             const { data } = await api.get("/audit_logs/list.php", { params });
             setLogs(data.data ?? []);
-            setTotal(data.meta?.total ?? 0);
         } catch (err) {
             console.error("Failed to fetch activity log:", err);
         } finally {
             setLoading(false);
         }
-    }, [dateFrom, dateTo, action, tableName, search, page]);
+    }, [dateFrom, dateTo, action, tableName, search]);
 
     useEffect(() => {
         fetchLogs();
     }, [fetchLogs]);
-
-    // Any filter change resets to page 0
-    const withReset = (setter) => (value) => {
-        setter(value);
-        setPage(0);
-    };
 
     const columns = [
         { key: "created_at", header: "Date & Time", render: (l) => formatDateTime(l.created_at) },
@@ -189,96 +176,76 @@ export default function ActivityLogs() {
         },
         { key: "table_name", header: "Module", render: (l) => tableLabel(l.table_name) },
         { key: "description", header: "Record", render: (l) => describeEntry(l) },
-        {
-            key: "actions", header: "",
-            render: (l) => (
-                <button
-                    onClick={() => setSelectedLog(l)}
-                    className="text-sm font-medium text-slate-600 hover:text-slate-900 transition"
-                >
-                    View
-                </button>
-            ),
-        },
+        // {
+        //     key: "actions", header: "",
+        //     render: (l) => (
+        //         <button
+        //             onClick={() => setSelectedLog(l)}
+        //             className="text-sm font-medium text-slate-600 hover:text-slate-900 transition"
+        //         >
+        //             View
+        //         </button>
+        //     ),
+        // },
     ];
 
-    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    const hasActiveFilters = dateFrom || dateTo || action || tableName || search;
 
     return (
         <>
-            <div className="mb-6">
-                <h1 className="text-lg font-semibold text-gray-900">Activity Log</h1>
-                <p className="text-sm text-gray-500">A record of who created, updated, or voided data across the system.</p>
-            </div>
+            <Toolbar
+                search={{ value: search, onChange: setSearch }}
+            />
 
-            {/* Filters */}
-            <div className="bg-white rounded-lg shadow px-5 py-4 mb-5 flex flex-wrap items-end gap-3">
-                <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">From</label>
-                    <input
-                        type="date"
-                        value={dateFrom}
-                        onChange={(e) => withReset(setDateFrom)(e.target.value)}
-                        className="px-3 py-1.5 rounded-md border border-gray-200 text-sm"
-                    />
-                </div>
-                <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">To</label>
-                    <input
-                        type="date"
-                        value={dateTo}
-                        onChange={(e) => withReset(setDateTo)(e.target.value)}
-                        className="px-3 py-1.5 rounded-md border border-gray-200 text-sm"
-                    />
-                </div>
-                <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Action</label>
+            <div className="bg-white rounded-lg shadow">
+                <div className="flex items-center justify-end gap-2 px-4 py-2.5 border-b border-gray-100 flex-wrap">
                     <select
                         value={action}
-                        onChange={(e) => withReset(setAction)(e.target.value)}
-                        className="px-3 py-1.5 rounded-md border border-gray-200 text-sm bg-white"
+                        onChange={(e) => setAction(e.target.value)}
+                        className="px-3 py-1.5 rounded-md border border-gray-200 text-gray-600 text-sm bg-white"
                     >
-                        <option value="">All</option>
+                        <option value="">All actions</option>
                         {ACTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
                     </select>
-                </div>
-                <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Module</label>
+
                     <select
                         value={tableName}
-                        onChange={(e) => withReset(setTableName)(e.target.value)}
-                        className="px-3 py-1.5 rounded-md border border-gray-200 text-sm bg-white"
+                        onChange={(e) => setTableName(e.target.value)}
+                        className="px-3 py-1.5 rounded-md border border-gray-200 text-gray-600 text-sm bg-white"
                     >
-                        <option value="">All</option>
+                        <option value="">All modules</option>
                         {Object.entries(TABLE_LABELS).map(([key, label]) => (
                             <option key={key} value={key}>{label}</option>
                         ))}
                     </select>
-                </div>
-                <div className="flex-1 min-w-[180px]">
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Search user / record ID</label>
+                    
                     <input
-                        type="text"
-                        value={search}
-                        onChange={(e) => withReset(setSearch)(e.target.value)}
-                        placeholder="e.g. Admin, 42"
-                        className="w-full px-3 py-1.5 rounded-md border border-gray-200 text-sm"
+                        type="date"
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                        className="px-3 py-1.5 rounded-md border border-gray-200 text-gray-600 text-sm"
                     />
-                </div>
-                {(dateFrom || dateTo || action || tableName || search) && (
-                    <button
-                        onClick={() => {
-                            setDateFrom(""); setDateTo(""); setAction(""); setTableName(""); setSearch("");
-                            setPage(0);
-                        }}
-                        className="px-3 py-1.5 rounded-md text-sm font-medium text-slate-600 hover:bg-slate-100 transition"
-                    >
-                        Clear
-                    </button>
-                )}
-            </div>
+                    <span className="text-gray-400 text-sm">to</span>
+                    <input
+                        type="date"
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
+                        className="px-3 py-1.5 rounded-md border border-gray-200 text-gray-600 text-sm"
+                    />
 
-            <div className="bg-white rounded-lg shadow">
+                    {hasActiveFilters && (
+                        <button
+                            onClick={() => {
+                                setDateFrom(""); setDateTo(""); setAction(""); setTableName(""); setSearch("");
+                            }}
+                            title="Clear filters"
+                            className="p-2 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition"
+                        >
+                            <X size={16} />
+                        </button>
+                    )}
+                </div>
+
                 <DataTable
                     columns={columns}
                     data={logs}
@@ -287,32 +254,6 @@ export default function ActivityLogs() {
                     onRowClick={(l) => setSelectedLog(l)}
                 />
             </div>
-
-            {/* Pagination */}
-            {total > 0 && (
-                <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
-                    <span>
-                        Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
-                    </span>
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => setPage((p) => Math.max(0, p - 1))}
-                            disabled={page === 0}
-                            className="p-1.5 rounded-md border border-gray-200 disabled:opacity-40 hover:bg-gray-50 transition"
-                        >
-                            <ChevronLeft size={16} />
-                        </button>
-                        <span>Page {page + 1} of {totalPages}</span>
-                        <button
-                            onClick={() => setPage((p) => (p + 1 < totalPages ? p + 1 : p))}
-                            disabled={page + 1 >= totalPages}
-                            className="p-1.5 rounded-md border border-gray-200 disabled:opacity-40 hover:bg-gray-50 transition"
-                        >
-                            <ChevronRight size={16} />
-                        </button>
-                    </div>
-                </div>
-            )}
 
             <DetailModal log={selectedLog} onClose={() => setSelectedLog(null)} />
         </>
