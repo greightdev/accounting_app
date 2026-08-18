@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../../api/axios";
 import Toast from "../../components/Toast";
 import useToast from "../../hooks/useToast";
+import { validateRequiredDate, validateRequiredSelect, validateFiscalYear } from "../../utils/validators";
 
 const toLocalDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
@@ -18,7 +19,12 @@ export default function PayTds() {
     const [notes, setNotes] = useState("");
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
+    const [fieldErrors, setFieldErrors] = useState({});
     const { toast, showToast, hideToast } = useToast();
+
+    const clearFieldError = (field) => {
+        if (fieldErrors[field]) setFieldErrors((prev) => ({ ...prev, [field]: "" }));
+    };
 
     useEffect(() => {
         fetchBankAccounts();
@@ -46,9 +52,12 @@ export default function PayTds() {
             if (fiscalYear) params.set("fiscal_year", fiscalYear);
             const { data } = await api.get(`/tds/list.php?${params.toString()}`);
             // Only PAYABLE and EXPENSE can ever be paid — RECEIVABLE is claimed, not paid
-            setEntries((data.data ?? []).filter((e) => e.tds_type !== "RECEIVABLE"));
+            const filtered = (data.data ?? []).filter((e) => e.tds_type !== "RECEIVABLE");
+            setEntries(filtered);
+            return filtered;
         } catch (err) {
             console.error("Failed to fetch unpaid TDS entries:", err);
+            return [];
         } finally {
             setLoading(false);
         }
@@ -56,10 +65,12 @@ export default function PayTds() {
 
     const toggleEntry = (id) => {
         setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+        clearFieldError("entries");
     };
 
     const toggleAll = () => {
         setSelectedIds(selectedIds.length === entries.length ? [] : entries.map((e) => e.id));
+        clearFieldError("entries");
     };
 
     const selectedTotal = entries
@@ -69,14 +80,47 @@ export default function PayTds() {
     const fmt = (n) => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
 
     const handleSubmit = async () => {
-        if (!date) return showToast("Date is required.", "error");
-        if (!bankAccountId) return showToast("Bank account is required.", "error");
-        if (!fiscalYear) return showToast("Fiscal year is required.", "error");
-        if (selectedIds.length === 0) return showToast("Select at least one TDS entry to pay.", "error");
+        const errors = {};
 
-        if (!window.confirm(`Pay Rs. ${fmt(selectedTotal)} to government, settling ${selectedIds.length} TDS entr${selectedIds.length !== 1 ? "ies" : "y"}?`)) return;
+        const dateErr = validateRequiredDate(date, { label: "Date" });
+        if (dateErr) errors.date = dateErr;
+
+        const bankErr = validateRequiredSelect(bankAccountId, { label: "Bank account" });
+        if (bankErr) errors.bankAccount = bankErr;
+
+        const fiscalYearErr = validateFiscalYear(fiscalYear);
+        if (fiscalYearErr) errors.fiscalYear = fiscalYearErr;
+
+        if (selectedIds.length === 0) errors.entries = "Select at least one TDS entry to pay.";
+
+        setFieldErrors(errors);
+        if (Object.keys(errors).length > 0) return;
 
         setSubmitting(true);
+
+        const freshEntries = await fetchUnpaidEntries();
+        const freshIds = new Set(freshEntries.map((e) => e.id));
+        const staleIds = selectedIds.filter((id) => !freshIds.has(id));
+
+        if (staleIds.length > 0) {
+            setSelectedIds((prev) => prev.filter((id) => freshIds.has(id)));
+            setSubmitting(false);
+            showToast(
+                `${staleIds.length} selected entr${staleIds.length !== 1 ? "ies were" : "y was"} already paid elsewhere. The list has been refreshed — please review your selection.`,
+                "error"
+            );
+            return;
+        }
+
+        const freshTotal = freshEntries
+            .filter((e) => selectedIds.includes(e.id))
+            .reduce((sum, e) => sum + Number(e.tds_amount || 0), 0);
+
+        if (!window.confirm(`Pay Rs. ${fmt(freshTotal)} to government, settling ${selectedIds.length} TDS entr${selectedIds.length !== 1 ? "ies" : "y"}?`)) {
+            setSubmitting(false);
+            return;
+        }
+
         try {
             await api.post("/tds/pay.php", {
                 date,
@@ -110,18 +154,35 @@ export default function PayTds() {
                             <label className={labelCls}>
                                 <span className="text-red-500 mr-0.5">*</span>Date
                             </label>
-                            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
+                            <input
+                                type="date"
+                                value={date}
+                                onChange={(e) => {
+                                    setDate(e.target.value);
+                                    clearFieldError("date");
+                                }}
+                                className={`${inputCls} ${fieldErrors.date ? "border-red-400" : ""}`}
+                            />
+                            {fieldErrors.date && <p className="mt-1 text-xs text-red-500">{fieldErrors.date}</p>}
                         </div>
                         <div>
                             <label className={labelCls}>
                                 <span className="text-red-500 mr-0.5">*</span>Bank Account
                             </label>
-                            <select value={bankAccountId} onChange={(e) => setBankAccountId(e.target.value)} className={inputCls}>
+                            <select
+                                value={bankAccountId}
+                                onChange={(e) => {
+                                    setBankAccountId(e.target.value);
+                                    clearFieldError("bankAccount");
+                                }}
+                                className={`${inputCls} ${fieldErrors.bankAccount ? "border-red-400" : ""}`}
+                            >
                                 <option value="">Select account</option>
                                 {bankAccounts.map((ba) => (
                                     <option key={ba.id} value={ba.id}>{ba.name}</option>
                                 ))}
                             </select>
+                            {fieldErrors.bankAccount && <p className="mt-1 text-xs text-red-500">{fieldErrors.bankAccount}</p>}
                         </div>
                         <div>
                             <label className={labelCls}>
@@ -130,10 +191,14 @@ export default function PayTds() {
                             <input
                                 type="text"
                                 value={fiscalYear}
-                                onChange={(e) => setFiscalYear(e.target.value)}
+                                onChange={(e) => {
+                                    setFiscalYear(e.target.value);
+                                    clearFieldError("fiscalYear");
+                                }}
                                 placeholder="e.g. 2081-82"
-                                className={inputCls}
+                                className={`${inputCls} ${fieldErrors.fiscalYear ? "border-red-400" : ""}`}
                             />
+                            {fieldErrors.fiscalYear && <p className="mt-1 text-xs text-red-500">{fieldErrors.fiscalYear}</p>}
                         </div>
                     </div>
 
@@ -148,41 +213,76 @@ export default function PayTds() {
                             No unpaid TDS entries for fiscal year {fiscalYear}.
                         </div>
                     ) : (
-                        <div className="overflow-x-auto border border-gray-100 rounded-lg">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="bg-slate-700 text-white">
-                                        <th className="px-3 py-2 w-8">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedIds.length === entries.length}
-                                                onChange={toggleAll}
-                                            />
-                                        </th>
-                                        <th className="px-4 py-2 text-left">Date</th>
-                                        <th className="px-4 py-2 text-left">Party</th>
-                                        <th className="px-4 py-2 text-left">Type</th>
-                                        <th className="px-4 py-2 text-right">Amount</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {entries.map((entry, idx) => (
-                                        <tr
-                                            key={entry.id}
-                                            onClick={() => toggleEntry(entry.id)}
-                                            className={`cursor-pointer ${idx % 2 === 0 ? "bg-white" : "bg-slate-50"} border-b border-slate-100 hover:bg-slate-100`}
-                                        >
-                                            <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                                                <input type="checkbox" checked={selectedIds.includes(entry.id)} onChange={() => toggleEntry(entry.id)} />
-                                            </td>
-                                            <td className="px-4 py-2">{entry.date}</td>
-                                            <td className="px-4 py-2">{entry.contact_name}</td>
-                                            <td className="px-4 py-2">{entry.tds_type}</td>
-                                            <td className="px-4 py-2 text-right">{fmt(entry.tds_amount)}</td>
+                        // <div className="overflow-x-auto border border-gray-100 rounded-lg">
+                        //     <table className="w-full text-sm">
+                        //         <thead>
+                        //             <tr className="bg-slate-700 text-white">
+                        //                 <th className="px-3 py-2 w-8">
+                        //                     <input
+                        //                         type="checkbox"
+                        //                         checked={selectedIds.length === entries.length}
+                        //                         onChange={toggleAll}
+                        //                     />
+                        //                 </th>
+                        //                 <th className="px-4 py-2 text-left">Date</th>
+                        //                 <th className="px-4 py-2 text-left">Party</th>
+                        //                 <th className="px-4 py-2 text-left">Type</th>
+                        //                 <th className="px-4 py-2 text-right">Amount</th>
+                        //             </tr>
+                        //         </thead>
+                        //         <tbody>
+                        //             {entries.map((entry, idx) => (
+                        //                 <tr
+                        //                     key={entry.id}
+                        //                     onClick={() => toggleEntry(entry.id)}
+                        //                     className={`cursor-pointer ${idx % 2 === 0 ? "bg-white" : "bg-slate-50"} border-b border-slate-100 hover:bg-slate-100`}
+                        //                 >
+                        //                     <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                        //                         <input type="checkbox" checked={selectedIds.includes(entry.id)} onChange={() => toggleEntry(entry.id)} />
+                        //                     </td>
+                        //                     <td className="px-4 py-2">{entry.date}</td>
+                        //                     <td className="px-4 py-2">{entry.contact_name}</td>
+                        //                     <td className="px-4 py-2">{entry.tds_type}</td>
+                        //                     <td className="px-4 py-2 text-right">{fmt(entry.tds_amount)}</td>
+                        <div>
+                            <div className={`overflow-x-auto border rounded-lg ${fieldErrors.entries ? "border-red-400" : "border-gray-100"}`}>
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="bg-slate-700 text-white">
+                                            <th className="px-3 py-2 w-8">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.length === entries.length}
+                                                    onChange={toggleAll}
+                                                />
+                                            </th>
+                                            <th className="px-4 py-2 text-left">Date</th>
+                                            <th className="px-4 py-2 text-left">Party</th>
+                                            <th className="px-4 py-2 text-left">Type</th>
+                                            <th className="px-4 py-2 text-right">Amount</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    {/* ))} */}
+                                    </thead>
+                                    <tbody>
+                                        {entries.map((entry, idx) => (
+                                            <tr
+                                                key={entry.id}
+                                                onClick={() => toggleEntry(entry.id)}
+                                                className={`cursor-pointer ${idx % 2 === 0 ? "bg-white" : "bg-slate-50"} border-b border-slate-100 hover:bg-slate-100`}
+                                            >
+                                                <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                                                    <input type="checkbox" checked={selectedIds.includes(entry.id)} onChange={() => toggleEntry(entry.id)} />
+                                                </td>
+                                                <td className="px-4 py-2">{entry.date}</td>
+                                                <td className="px-4 py-2">{entry.contact_name}</td>
+                                                <td className="px-4 py-2">{entry.tds_type}</td>
+                                                <td className="px-4 py-2 text-right">{fmt(entry.tds_amount)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {fieldErrors.entries && <p className="mt-1 text-xs text-red-500">{fieldErrors.entries}</p>}
                         </div>
                     )}
 
@@ -204,7 +304,7 @@ export default function PayTds() {
                         </div>
                         <button
                             onClick={handleSubmit}
-                            disabled={submitting || selectedIds.length === 0}
+                            disabled={submitting}
                             className="px-6 py-2.5 rounded-lg bg-slate-700 text-white text-sm font-semibold hover:bg-slate-800 transition disabled:opacity-60"
                         >
                             {submitting ? "Processing..." : "Record TDS Payment"}
