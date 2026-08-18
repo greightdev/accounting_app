@@ -27,7 +27,7 @@ export default function TreeNode({
                     </span>
                 </div>
 
-                {(onEdit || onDelete) && (
+                {!node.is_system && (onEdit || onDelete) && (
                     <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                         {onEdit && (
                             <button
@@ -77,7 +77,7 @@ export default function TreeNode({
                     </span>
                 </div>
 
-                {(onEditGroup || onDeleteGroup) && (
+                {!node.is_system && (onEditGroup || onDeleteGroup) && (
                     <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                         {onEditGroup && (
                             <button

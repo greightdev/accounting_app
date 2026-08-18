@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 try {
     // Fetch all active groups
     $stmt = $pdo->query("
-        SELECT id, name, code, type, parent_id, is_active
+        SELECT id, name, code, type, parent_id, is_active, is_system
         FROM account_groups
         WHERE is_active = TRUE
         ORDER BY code

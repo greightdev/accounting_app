@@ -59,7 +59,7 @@ if ($errors) {
 try {
     // Check group exists
     $existing = $pdo->prepare("
-        SELECT id, name, code, parent_id, type
+        SELECT id, name, code, parent_id, type, is_system
         FROM account_groups
         WHERE id = ? AND is_active = TRUE
     ");
@@ -81,6 +81,26 @@ try {
         echo json_encode([
             "success" => false,
             "message" => "Root groups cannot be edited."
+        ]);
+        exit();
+    }
+
+    // Core structural groups cannot be renamed or reparented (some, like
+    // Bank/Cash, are matched by name elsewhere — see accounts/create.php)
+    if ($group['is_system'] && strtolower($name) !== strtolower($group['name'])) {
+        http_response_code(403);
+        echo json_encode([
+            "success" => false,
+            "message" => "This is a system group and its name cannot be changed."
+        ]);
+        exit();
+    }
+
+    if ($group['is_system'] && (int)$parentId !== (int)$group['parent_id']) {
+        http_response_code(403);
+        echo json_encode([
+            "success" => false,
+            "message" => "This is a system group and its parent cannot be changed."
         ]);
         exit();
     }

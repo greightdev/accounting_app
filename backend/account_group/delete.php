@@ -43,7 +43,7 @@ if ($id <= 0) {
 try {
     // Check account group exists
     $existing = $pdo->prepare("
-        SELECT id, name, parent_id
+        SELECT id, name, parent_id, is_system
         FROM account_groups
         WHERE id = ? AND is_active = TRUE
     ");
@@ -65,6 +65,16 @@ try {
         echo json_encode([
             "success" => false,
             "message" => "Root groups cannot be deleted."
+        ]);
+        exit();
+    }
+
+    // Core structural groups (e.g. Current Assets, Cash, Bank) cannot be deleted
+    if ($group['is_system']) {
+        http_response_code(403);
+        echo json_encode([
+            "success" => false,
+            "message" => "This is a system group and cannot be deleted."
         ]);
         exit();
     }

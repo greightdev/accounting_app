@@ -10,7 +10,7 @@ import Toast from "../components/Toast";
 import useToast from "../hooks/useToast";
 import { useAuth } from "../context/AuthContext";
 import { can } from "../permissions";
-import { validateGenericName, filterNameInput } from "../utils/validators";
+import { validateGenericName, filterItemNameInput } from "../utils/validators";
 
 const emptyAccountForm = { name: '', account_group_id: '' };
 const emptyGroupForm = { name: '', parent_id: '' };
@@ -357,30 +357,35 @@ export default function ChartofAccounts() {
         return matchesSearch;
     });
 
+    const anyEditableAccount = accounts.some((a) => !a.is_system);
+    const anyEditableGroup = groupsFlat.some((g) => !g.is_system);
+
     const accountColumns = [
         { key: "code", header: "Code", },
         { key: "name", header: "Name", },
         { key: "account_group_name", header: "Group", },
         { key: "account_group_type", header: "Account Type", },
-        { key: "actions", header: "Action", render: (account) => (
-            <div className="flex items-center gap-2">
-                <button
-                    onClick={() => openEditModal(account)}
-                    className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
-                >
-                    <SquarePen size={16} />
-                </button>
-
-                {canDelete && (
+        ...(anyEditableAccount ? [{ key: "actions", header: "Action", render: (account) => (
+            account.is_system ? null : (
+                <div className="flex items-center gap-2">
                     <button
-                        onClick={() => handleDelete(account.id)}
+                        onClick={() => openEditModal(account)}
                         className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
                     >
-                        <Trash2 size={16} />
+                        <SquarePen size={16} />
                     </button>
-                )}
-            </div>
-        ) },
+
+                    {canDelete && (
+                        <button
+                            onClick={() => handleDelete(account.id)}
+                            className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
+                        >
+                            <Trash2 size={16} />
+                        </button>
+                    )}
+                </div>
+            )
+        ) }] : []),
     ];
 
     const groupColumns = [
@@ -388,25 +393,27 @@ export default function ChartofAccounts() {
         { key: "name", header: "Name", },
         { key: "parent_name", header: "Parent Group", },
         { key: "type", header: "Group Type", },
-        { key: "actions", header: "Action", render: (group) => (
-            <div className="flex items-center gap-2">
-                <button
-                    onClick={() => openEditGroupModal(group)}
-                    className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
-                >
-                    <SquarePen size={16} />
-                </button>
-
-                {canDelete && (
+        ...(anyEditableGroup ? [{ key: "actions", header: "Action", render: (group) => (
+            group.is_system ? null : (
+                <div className="flex items-center gap-2">
                     <button
-                        onClick={() => handleGroupDelete(group.id)}
+                        onClick={() => openEditGroupModal(group)}
                         className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
                     >
-                        <Trash2 size={16} />
+                        <SquarePen size={16} />
                     </button>
-                )}
-            </div>
-        ) },
+
+                    {canDelete && (
+                        <button
+                            onClick={() => handleGroupDelete(group.id)}
+                            className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
+                        >
+                            <Trash2 size={16} />
+                        </button>
+                    )}
+                </div>
+            )
+        ) }] : []),
     ];
 
     return (
