@@ -33,6 +33,7 @@ const navItems = [
     { label: 'Journal', path: '/journal' },
     { label: 'Chart of Accounts', path: '/chartofaccounts' },
     { label: 'Account Reports', path: '/reports' },
+    { label: 'Users', path: '/users' },
     { label: 'Activity Logs', path: '/activitylogs' },
     { label: 'Settings', path: '/settings' },
 ];

@@ -16,16 +16,62 @@ const PAGE_TITLES = {
   '/journal': 'Journal',
   '/chartofaccounts': 'Chart of Accounts',
   '/reports': 'Reports',
+  '/users': 'Users',
   '/activitylogs': 'Activity Logs',
   '/settings': 'Settings',
-}
+};
+
+const REPORT_TITLES = {
+  "/reports/account-ledger": "Account Ledger",
+  "/reports/group-ledger": "Group Ledger",
+  "/reports/trial-balance": "Trial Balance",
+  "/reports/profit-loss": "Profit & Loss Statement",
+  "/reports/balance-sheet": "Balance Sheet",
+  "/reports/cash-flow": "Cash Flow Statement",
+  "/reports/day-book": "Day Book",
+
+  "/reports/sales-register": "Sales Register",
+  "/reports/sales-by-customer": "Sales By Customer",
+  "/reports/sales-by-item": "Sales By Item",
+  "/reports/master-sales": "Master Sales Report",
+
+  "/reports/purchase-register": "Purchase Register",
+  "/reports/purchase-by-vendor": "Purchase By Vendor",
+  "/reports/purchase-by-item": "Purchase By Item",
+  "/reports/master-purchase": "Master Purchase Report",
+
+  "/reports/customer-balance": "Customer Balance",
+  "/reports/receivables-ageing": "Receivables Ageing",
+  "/reports/customer-transactions": "Customer Transactions",
+  "/reports/contact-ledger": "Contact Ledger",
+  "/reports/transaction-summary": "Transaction Summary",
+
+  "/reports/vendor-balances": "Vendor Balances",
+  "/reports/payables-ageing": "Payables Ageing",
+  "/reports/vendor-transactions": "Vendor Transactions",
+
+  "/reports/tds-receivable": "TDS Receivable",
+  "/reports/tds-payable": "TDS Payable",
+  "/reports/tds-expense": "TDS Expense",
+  "/reports/tds-summary": "TDS Summary",
+  "/reports/annexure-13": "Annexure 13",
+
+  "/reports/sales-account-np": "बिक्री खाता (Sales Account)",
+  "/reports/purchase-account-np": "खरिद खाता (Purchase Account)",
+  "/reports/vat-return": "VAT Return",
+  "/reports/tds-report-np": "TDS Report",
+  "/reports/tds-summary-np": "TDS Summary",
+};
 
 export default function Topbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
 
-  const title = PAGE_TITLES[location.pathname] ?? 'Overview';
+  const title =
+    PAGE_TITLES[location.pathname] ??
+    REPORT_TITLES[location.pathname] ??
+    "Overview";
 
   const handleLogout = async () => {
     await logout();
