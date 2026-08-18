@@ -1,4 +1,3 @@
-// components/ReportTable.jsx
 import { useState } from "react";
 import { Download, FileSpreadsheet } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -14,6 +13,7 @@ export default function ReportTable({
     onDateFilterChange,
     footerRow = null,
     filterContent = null,
+    rowClassName = null,
 }) {
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
@@ -67,8 +67,7 @@ export default function ReportTable({
 
     return (
         <div className="bg-white rounded-lg shadow">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-                <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+            <div className="flex items-center justify-end gap-1.5 px-4 py-2.5 border-b border-gray-100">
 
                 <div className="flex items-center gap-3">
                     {filterContent}
@@ -79,14 +78,14 @@ export default function ReportTable({
                                 type="date"
                                 value={dateFrom}
                                 onChange={(e) => setDateFrom(e.target.value)}
-                                className="px-3 py-1.5 rounded-md border border-gray-200 text-sm"
+                                className="px-3 py-1.5 rounded-md border border-gray-200 text-gray-600 text-sm"
                             />
                             <span className="text-gray-400 text-sm">to</span>
                             <input
                                 type="date"
                                 value={dateTo}
                                 onChange={(e) => setDateTo(e.target.value)}
-                                className="px-3 py-1.5 rounded-md border border-gray-200 text-sm"
+                                className="px-3 py-1.5 rounded-md border border-gray-200 text-gray-600 text-sm"
                             />
                             <button
                                 onClick={applyFilter}
@@ -104,7 +103,7 @@ export default function ReportTable({
                                 type="date"
                                 value={asOf}
                                 onChange={(e) => setAsOf(e.target.value)}
-                                className="px-3 py-1.5 rounded-md border border-gray-200 text-sm"
+                                className="px-3 py-1.5 rounded-md border border-gray-200 text-gray-600 text-sm"
                             />
                             <button
                                 onClick={applyFilter}
@@ -132,7 +131,7 @@ export default function ReportTable({
                 </div>
             </div>
 
-            <DataTable columns={columns} data={data} loading={loading} footerRow={footerRow} />
+            <DataTable columns={columns} data={data} loading={loading} footerRow={footerRow} rowClassName={rowClassName} paginate={false} />
         </div>
     );
 }

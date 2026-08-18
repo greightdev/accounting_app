@@ -80,6 +80,7 @@ export const ACCOUNTING_REPORTS = {
         summaryFields: [
             { key: "net_profit", label: "Net Profit / (Loss)" },
         ],
+        rowClassName: (row) => (row.is_subtotal ? "font-semibold bg-slate-100" : ""),
     },
     "balance-sheet": {
         title: "Balance Sheet",
@@ -91,6 +92,7 @@ export const ACCOUNTING_REPORTS = {
             { key: "section", header: "Section" },
             { key: "amount", header: "Amount", align: "right", render: (r) => r.amount === "" || r.amount == null ? "-" : Number(r.amount).toLocaleString(undefined, { minimumFractionDigits: 2 }) },
         ],
+        rowClassName: (row) => (row.is_subtotal ? "font-semibold bg-slate-100" : ""),
     },
     "cash-flow": {
         title: "Cash Flow Statement",

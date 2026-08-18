@@ -195,6 +195,7 @@ export default function ReportViewer() {
                 dateMode={report.dateMode ?? "range"}
                 onDateFilterChange={setDateFilter}
                 footerRow={footerRow}
+                rowClassName={report.rowClassName}
             />
             {meta?.is_balanced === false && (
                 <p className="mt-3 text-sm text-red-600 font-medium">
