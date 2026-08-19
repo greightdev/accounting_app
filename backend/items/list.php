@@ -16,33 +16,51 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     exit();
 }
 
-// Filter: ?tax_type=VAT13 / Exempt
+// Filters
 $taxType = $_GET['tax_type'] ?? null;
+$type = $_GET['type'] ?? null;
+$vendorId = isset($_GET['vendor_id']) && $_GET['vendor_id'] !== '' ? (int) $_GET['vendor_id'] : null;
+
 $validTaxType = ['VAT13', 'Exempt'];
+$validType = ['SELLING', 'PURCHASE'];
 
 try {
     $sql = "
         SELECT
-            id,
-            name,
-            unit,
-            hsn_sac_code,
-            selling_price,
-            purchase_rate,
-            tax_type,
-            created_at,
-            updated_at
-        FROM items
-        WHERE is_active = TRUE
+            i.id,
+            i.name,
+            i.type,
+            i.vendor_id,
+            v.name AS vendor_name,
+            i.unit,
+            i.hsn_sac_code,
+            i.selling_price,
+            i.purchase_rate,
+            i.tax_type,
+            i.created_at,
+            i.updated_at
+        FROM items i
+        LEFT JOIN contacts v ON v.id = i.vendor_id
+        WHERE i.is_active = TRUE
     ";
     $params = [];
 
     if ($taxType && in_array($taxType, $validTaxType, true)) {
-        $sql .= " AND tax_type = ?";
+        $sql .= " AND i.tax_type = ?";
         $params[] = $taxType;
     }
 
-    $sql .= " ORDER BY name";
+    if ($type && in_array($type, $validType, true)) {
+        $sql .= " AND i.type = ?";
+        $params[] = $type;
+    }
+
+    if ($vendorId) {
+        $sql .= " AND i.vendor_id = ?";
+        $params[] = $vendorId;
+    }
+
+    $sql .= " ORDER BY i.name";
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);

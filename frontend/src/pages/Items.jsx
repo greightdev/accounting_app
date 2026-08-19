@@ -6,7 +6,7 @@ import Modal from "../components/Modal";
 import api from "../api/axios";
 import Toast from "../components/Toast";
 import useToast from "../hooks/useToast";
-import { validateItemName, validateUnit, validateHsnSac, validatePrice, filterItemNameInput, filterUnitInput, filterDigitsOnly, filterDecimalInput } from "../utils/validators";
+import { validateItemName, validateUnit, validateHsnSac, validatePrice, validateRequiredSelect, filterItemNameInput, filterUnitInput, filterDigitsOnly, filterDecimalInput } from "../utils/validators";
 import { useAuth } from "../context/AuthContext";
 import { can } from "../permissions";
 
@@ -17,18 +17,20 @@ const emptyForm = {
     selling_price: '',
     purchase_rate: '',
     tax_type: 'VAT13',
+    vendor_id: '',
 }
 
 export default function Items() {
     const { role } = useAuth();
     const canDelete = can(role, "canDelete");
     const [items, setItems] = useState([]);
+    const [vendors, setVendors] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('All');
     const [search, setSearch] = useState('');
 
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [modalType, setModalType] = useState('selling');
+    const [modalType, setModalType] = useState('selling'); // 'selling' | 'purchase'
     const [editingItem, setEditingItem] = useState(null);
     const [form, setForm] = useState(emptyForm);
     const [fieldErrors, setFieldErrors] = useState({});
@@ -40,16 +42,32 @@ export default function Items() {
         fetchItems();
     }, [filter]);
 
+    useEffect(() => {
+        fetchVendors();
+    }, []);
+
+    const filterToType = { All: '', Selling: 'SELLING', Purchase: 'PURCHASE' };
+
     const fetchItems = async () => {
         setLoading(true);
         try {
-            const query = filter !== 'All' ? `?type=${filter}` : '';
+            const typeParam = filterToType[filter];
+            const query = typeParam ? `?type=${typeParam}` : '';
             const { data } = await api.get(`/items/list.php${query}`);
             setItems(data.data ?? []);
         } catch (err) {
             console.error('Failed to fetch items: ', err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchVendors = async () => {
+        try {
+            const { data } = await api.get('/contacts/list.php?type=Vendor');
+            setVendors(data.data ?? []);
+        } catch (err) {
+            console.error('Failed to fetch vendors: ', err);
         }
     };
 
@@ -63,10 +81,7 @@ export default function Items() {
     };
 
     const openEditModal = (item) => {
-        const inferredType = 
-            Number(item.purchase_rate) > 0 && Number(item.selling_price) === 0
-                ? 'purchase'
-                : 'selling';
+        const inferredType = item.type === 'PURCHASE' ? 'purchase' : 'selling';
         setModalType(inferredType);
         setEditingItem(item);
         setForm({
@@ -76,6 +91,7 @@ export default function Items() {
             selling_price: item.selling_price,
             purchase_rate: item.purchase_rate,
             tax_type: item.tax_type,
+            vendor_id: item.vendor_id ? String(item.vendor_id) : '',
         });
         setModalError('');
         setFieldErrors({});
@@ -106,7 +122,7 @@ export default function Items() {
         } else if (name === 'selling_price' || name === 'purchase_rate') {
             nextValue = filterDecimalInput(value);
         }
-        
+
         setForm((prev) => ({
             ...prev,
             [name]: nextValue,
@@ -122,13 +138,18 @@ export default function Items() {
             name: validateItemName(form.name),
             unit: validateUnit(form.unit),
             hsn_sac_code: validateHsnSac(form.hsn_sac_code),
-            // selling_price: validatePrice(form.selling_price, { label: "Selling price" }),
-            // purchase_rate: validatePrice(form.purchase_rate, { label: "Purchase rate" }),
         };
         if (modalType === 'selling') {
             errors.selling_price = validatePrice(form.selling_price, { label: "Selling price" });
+            if (!errors.selling_price && Number(form.selling_price) <= 0) {
+                errors.selling_price = "Selling price must be greater than zero.";
+            }
         } else {
             errors.purchase_rate = validatePrice(form.purchase_rate, { label: "Purchase rate" });
+            if (!errors.purchase_rate && Number(form.purchase_rate) <= 0) {
+                errors.purchase_rate = "Purchase rate must be greater than zero.";
+            }
+            errors.vendor_id = validateRequiredSelect(form.vendor_id, { label: "Vendor" });
         }
         Object.keys(errors).forEach((key) => { if (!errors[key]) delete errors[key]; });
         return errors;
@@ -145,19 +166,23 @@ export default function Items() {
         }
         setFieldErrors({});
         setSubmitting(true);
-    
+
+        const itemType = modalType === 'selling' ? 'SELLING' : 'PURCHASE';
         const sellingPrice = modalType === 'selling'
             ? form.selling_price
             : (editingItem ? form.selling_price : '0');
         const purchaseRate = modalType === 'purchase'
             ? form.purchase_rate
             : (editingItem ? form.purchase_rate : '0');
+        const vendorId = modalType === 'purchase' ? form.vendor_id : null;
 
         try {
             if (editingItem) {
                 await api.put('/items/update.php', {
                     id: editingItem.id,
                     name: form.name,
+                    type: itemType,
+                    vendor_id: vendorId,
                     unit: form.unit,
                     hsn_sac_code: form.hsn_sac_code,
                     selling_price: sellingPrice,
@@ -168,6 +193,8 @@ export default function Items() {
             } else {
                 await api.post('/items/create.php', {
                     name: form.name,
+                    type: itemType,
+                    vendor_id: vendorId,
                     unit: form.unit,
                     hsn_sac_code: form.hsn_sac_code,
                     selling_price: sellingPrice,
@@ -186,10 +213,10 @@ export default function Items() {
             setSubmitting(false);
         }
     };
-    
+
     const handleDelete = async (id) => {
         if (!window.confirm('Are you sure you want to delete this item?')) return;
-    
+
         try {
             await api.delete('/items/delete.php', { data: { id } });
             showToast("Item deleted successfully.");
@@ -207,15 +234,35 @@ export default function Items() {
 
     const columns = [
         { key: "name", header: "Name", },
+        { key: "type", header: "Type",
+            render: (item) => (
+                <span
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium ${
+                        item.type === 'PURCHASE'
+                            ? 'bg-amber-50 text-amber-600'
+                            : 'bg-emerald-50 text-emerald-600'
+                    }`}
+                >
+                    {item.type === 'PURCHASE' ? 'Purchase' : 'Selling'}
+                </span>
+            ),
+        },
+        { key: "vendor_name", header: "Vendor",
+            render: (item) => item.vendor_name ?? <span className="text-gray-300">—</span>,
+        },
         { key: "unit", header: "Unit", },
         { key: "hsn_sac_code", header: "HSN/SAC", },
-        { key: "selling_price", header: "Selling Price", },
-        { key: "purchase_rate", header: "Purchase Rate", },
+        { key: "selling_price", header: "Selling Price",
+            render: (item) => item.type === 'PURCHASE' ? <span className="text-gray-300">—</span> : item.selling_price,
+        },
+        { key: "purchase_rate", header: "Purchase Rate",
+            render: (item) => item.type !== 'PURCHASE' ? <span className="text-gray-300">—</span> : item.purchase_rate,
+        },
         { key: "tax_type", header: "Tax", },
-        { key: "actions", header: "Action", render: (contact) => (
+        { key: "actions", header: "Action", render: (item) => (
             <div className="flex items-center gap-2">
                 <button
-                    onClick={() => openEditModal(contact)}
+                    onClick={() => openEditModal(item)}
                     className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
                 >
                     <SquarePen size={16} />
@@ -223,7 +270,7 @@ export default function Items() {
 
                 {canDelete && (
                     <button
-                        onClick={() => handleDelete(contact.id)}
+                        onClick={() => handleDelete(item.id)}
                         className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
                     >
                         <Trash2 size={16} />
@@ -243,6 +290,7 @@ export default function Items() {
 
             <Toolbar
                 search={{ value: search, onChange: setSearch }}
+                filters={{ options: ['All', 'Selling', 'Purchase'], active: filter, onChange: setFilter }}
                 actions={[
                     { label: '+ Selling Item', onClick: () => openCreateModal('selling') },
                     { label: '+ Purchase Item', onClick: () => openCreateModal('purchase') },
@@ -281,6 +329,25 @@ export default function Items() {
                         {fieldErrors.name && <p className="mt-1 text-xs text-red-500">{fieldErrors.name}</p>}
                     </div>
 
+                    {modalType === 'purchase' && (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Vendor</label>
+                            <select
+                                name="vendor_id"
+                                value={form.vendor_id}
+                                onChange={handleChange}
+                                disabled={!!editingItem}
+                                className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.vendor_id ? 'border-red-400' : 'border-gray-200'} bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition ${editingItem ? 'opacity-60 cursor-not-allowed' : ''}`}
+                            >
+                                <option value="">Select vendor</option>
+                                {vendors.map((v) => (
+                                    <option key={v.id} value={v.id}>{v.name}</option>
+                                ))}
+                            </select>
+                            {fieldErrors.vendor_id && <p className="mt-1 text-xs text-red-500">{fieldErrors.vendor_id}</p>}
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1.5">Unit</label>
@@ -308,7 +375,6 @@ export default function Items() {
                         </div>
                     </div>
 
-                    {/* <div className="grid grid-cols-2 gap-4"> */}
                     {modalType === 'selling' ? (
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1.5">Selling Price</label>
