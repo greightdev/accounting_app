@@ -134,14 +134,19 @@ try {
         }
 
         $itemStmt = $pdo->prepare("
-            SELECT id, name
+            SELECT id, name, type
             FROM items
             WHERE id = ? AND is_active = TRUE
         ");
         $itemStmt->execute([$itemId]);
+        $itemRow = $itemStmt->fetch();
 
-        if (!$itemStmt->fetch()) {
+        if (!$itemRow) {
             $errors[] = "Line " . ($idx + 1) . ": item not found.";
+            continue;
+        }
+        if ($itemRow['type'] === 'PURCHASE') {
+            $errors[] = "Line " . ($idx + 1) . ": \"{$itemRow['name']}\" is a purchase item and cannot be sold.";
             continue;
         }
 

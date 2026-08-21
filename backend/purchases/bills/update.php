@@ -133,14 +133,19 @@ try {
         }
 
         $itemStmt = $pdo->prepare("
-            SELECT id, name
+            SELECT id, name, type, vendor_id
             FROM items
             WHERE id = ? AND is_active = TRUE
         ");
         $itemStmt->execute([$itemId]);
+        $itemRow = $itemStmt->fetch();
 
-        if (!$itemStmt->fetch()) {
+        if (!$itemRow) {
             $errors[] = "Line " . ($idx + 1) . ": item not found.";
+            continue;
+        }
+        if ($itemRow['type'] === 'PURCHASE' && (int)$itemRow['vendor_id'] !== (int)$contactId) {
+            $errors[] = "Line " . ($idx + 1) . ": \"{$itemRow['name']}\" does not belong to this vendor.";
             continue;
         }
 
