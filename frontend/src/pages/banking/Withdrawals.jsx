@@ -11,6 +11,19 @@ import useToast from "../../hooks/useToast";
 import Toast from "../../components/Toast";
 import TransactionView from "../../components/TransactionView";
 import { adaptTransactionForView } from "../../ViewAdapters";
+import { paymentModeLabel } from "../../constants/paymentModes";
+
+// Labels for the transaction-type badge — everything here decreases a bank/cash balance.
+const TYPE_LABELS = {
+    BANK_WITH: "Withdrawal",
+    PAYMENT: "Payment",
+    TDS_PAYMENT: "TDS Payment",
+};
+const TYPE_BADGE_CLASS = {
+    BANK_WITH: "bg-sky-50 text-sky-600",
+    PAYMENT: "bg-amber-50 text-amber-600",
+    TDS_PAYMENT: "bg-rose-50 text-rose-600",
+};
 
 export default function Withdrawals() {
     const { role } = useAuth();
@@ -40,7 +53,7 @@ export default function Withdrawals() {
     const fetchTransactions = async () => {
         setLoading(true);
         try {
-            const { data } = await api.get(`/banking/list.php?type=BANK_WITH&status=${tab}`);
+            const { data } = await api.get(`/banking/list.php?direction=out&status=${tab}`);
             setTransactions(data.data ?? []);
         } catch (err) {
             console.error('Failed to fetch withdrawals: ', err);
@@ -72,7 +85,7 @@ export default function Withdrawals() {
         const matchesSearch = 
             tx.ref_number.toLowerCase().includes(term) ||
             (tx.bank_account_name ?? "").toLowerCase().includes(term) ||
-            (tx.contra_account_name ?? "").toLowerCase().includes(term);
+            (tx.counterparty_name ?? "").toLowerCase().includes(term);
         return matchesSearch
     });
 
@@ -153,8 +166,20 @@ export default function Withdrawals() {
     const baseColumns = [
         { key: "date", header: "Date", },
         { key: "ref_number", header: "#", },
+        { key: "type", header: "Type",
+            render: (tx) => (
+                <span className={`px-2.5 py-1 rounded-md text-xs font-medium ${TYPE_BADGE_CLASS[tx.type] ?? "bg-gray-50 text-gray-600"}`}>
+                    {TYPE_LABELS[tx.type] ?? tx.type}
+                </span>
+            ),
+        },
         { key: "bank_account_name", header: "Withdrawn From", },
-        { key: "contra_account_name", header: "Destination", },
+        { key: "counterparty_name", header: "Destination",
+            render: (tx) => tx.counterparty_name ?? <span className="text-gray-300">—</span>,
+        },
+        { key: "payment_mode", header: "Mode",
+            render: (tx) => tx.payment_mode ? paymentModeLabel(tx.payment_mode) : <span className="text-gray-300">—</span>,
+        },
         { key: "total_amount", header: "Amount",
             render: (tx) => tx.total_amount.toLocaleString(undefined, {
                 minimumFractionDigits: 2,
@@ -166,7 +191,7 @@ export default function Withdrawals() {
         key: "actions",
         header: "Action",
         stopRowClick: true,
-        render: (tx) => (
+        render: (tx) => tx.is_native ? (
             <div className="flex items-center gap-2">
                 <button
                     onClick={() => handleDelete(tx.id)}
@@ -175,6 +200,8 @@ export default function Withdrawals() {
                     <Trash2 size={16} />
                 </button>
             </div>
+        ) : (
+            <span className="text-xs text-gray-400">via {TYPE_LABELS[tx.type] ?? tx.type}</span>
         ),
     };
 
@@ -182,21 +209,21 @@ export default function Withdrawals() {
         key: "actions",
         header: "Action",
         stopRowClick: true,
-        render: (tx) => (
+        render: (tx) => tx.is_native ? (
             <button
                 onClick={() => handleEdit(tx)}
                 className="p-2 rounded-md text-slate-600 hover:bg-slate-100"
             >
                 <SquarePen size={16} />
             </button>
-        ),
+        ) : null,
     };
 
     const approvalColumn = {
         key: "approve",
         header: "Approve / Reject",
         stopRowClick: true,
-        render: (tx) => (
+        render: (tx) => tx.is_native ? (
             <div className="flex items-center gap-2">
                 <button
                     onClick={() => handleApprove(tx.id)}
@@ -214,7 +241,7 @@ export default function Withdrawals() {
                     <X size={16} />
                 </button>
             </div>
-        ),
+        ) : null,
     };
 
     const approvedColumns = [
