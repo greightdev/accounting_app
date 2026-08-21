@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import api from "../../api/axios";
 import Toast from "../../components/Toast";
 import useToast from "../../hooks/useToast";
-import { validateRequiredDate, validateRequiredSelect, validateFiscalYear } from "../../utils/validators";
+import { validateRequiredDate, validateRequiredSelect, validateFiscalYear, validatePaymentMode, validatePaymentRef } from "../../utils/validators";
+import { PAYMENT_MODES, NON_CASH_PAYMENT_MODES, paymentModeRequiresRef, paymentRefLabel } from "../../constants/paymentModes";
 
 const toLocalDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
@@ -14,6 +15,8 @@ export default function PayTds() {
     const [selectedIds, setSelectedIds] = useState([]);
     const [bankAccounts, setBankAccounts] = useState([]);
     const [bankAccountId, setBankAccountId] = useState("");
+    const [paymentMode, setPaymentMode] = useState("");
+    const [paymentRef, setPaymentRef] = useState("");
     const [fiscalYear, setFiscalYear] = useState("");
     const [date, setDate] = useState(toLocalDate(new Date()));
     const [notes, setNotes] = useState("");
@@ -63,6 +66,24 @@ export default function PayTds() {
         }
     };
 
+    const selectedBankAccount = bankAccounts.find((ba) => String(ba.id) === String(bankAccountId));
+    const isCashAccount = selectedBankAccount?.account_type === "CASH";
+    const modeOptions = isCashAccount ? PAYMENT_MODES.filter((m) => m.value === "CASH") : NON_CASH_PAYMENT_MODES;
+
+    const handleBankAccountChange = (value) => {
+        setBankAccountId(value);
+        clearFieldError("bankAccount");
+        const account = bankAccounts.find((ba) => String(ba.id) === String(value));
+        if (account?.account_type === "CASH") {
+            setPaymentMode("CASH");
+            setPaymentRef("");
+            clearFieldError("paymentRef");
+        } else if (paymentMode === "CASH") {
+            setPaymentMode("");
+        }
+        clearFieldError("paymentMode");
+    };
+
     const toggleEntry = (id) => {
         setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
         clearFieldError("entries");
@@ -87,6 +108,12 @@ export default function PayTds() {
 
         const bankErr = validateRequiredSelect(bankAccountId, { label: "Bank account" });
         if (bankErr) errors.bankAccount = bankErr;
+
+        const modeErr = validatePaymentMode(paymentMode);
+        if (modeErr) errors.paymentMode = modeErr;
+
+        const refErr = validatePaymentRef(paymentRef, { mode: paymentMode, required: paymentModeRequiresRef(paymentMode) });
+        if (refErr) errors.paymentRef = refErr;
 
         const fiscalYearErr = validateFiscalYear(fiscalYear);
         if (fiscalYearErr) errors.fiscalYear = fiscalYearErr;
@@ -125,6 +152,8 @@ export default function PayTds() {
             await api.post("/tds/pay.php", {
                 date,
                 bank_account_id: parseInt(bankAccountId),
+                payment_mode: paymentMode,
+                payment_ref: paymentRef.trim() || null,
                 tds_entry_ids: selectedIds,
                 fiscal_year: fiscalYear,
                 notes,
@@ -144,9 +173,9 @@ export default function PayTds() {
             <Toast toast={toast} onClose={hideToast} />
 
             <div className="bg-white rounded-2xl shadow-sm">
-                <div className="px-7 py-5 border-b border-gray-100">
+                {/* <div className="px-7 py-5 border-b border-gray-100">
                     <h2 className="text-lg font-semibold text-gray-900">Pay TDS to Government</h2>
-                </div>
+                </div> */}
 
                 <div className="px-7 py-6 space-y-6">
                     <div className="grid grid-cols-3 gap-4">
@@ -165,16 +194,16 @@ export default function PayTds() {
                             />
                             {fieldErrors.date && <p className="mt-1 text-xs text-red-500">{fieldErrors.date}</p>}
                         </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
                         <div>
                             <label className={labelCls}>
                                 <span className="text-red-500 mr-0.5">*</span>Bank Account
                             </label>
                             <select
                                 value={bankAccountId}
-                                onChange={(e) => {
-                                    setBankAccountId(e.target.value);
-                                    clearFieldError("bankAccount");
-                                }}
+                                onChange={(e) => handleBankAccountChange(e.target.value)}
                                 className={`${inputCls} ${fieldErrors.bankAccount ? "border-red-400" : ""}`}
                             >
                                 <option value="">Select account</option>
@@ -184,6 +213,53 @@ export default function PayTds() {
                             </select>
                             {fieldErrors.bankAccount && <p className="mt-1 text-xs text-red-500">{fieldErrors.bankAccount}</p>}
                         </div>
+                        <div>
+                            <label className={labelCls}>
+                                <span className="text-red-500 mr-0.5">*</span>Mode
+                            </label>
+                            <select
+                                value={paymentMode}
+                                onChange={(e) => {
+                                    setPaymentMode(e.target.value);
+                                    clearFieldError("paymentMode");
+                                    clearFieldError("paymentRef");
+                                }}
+                                disabled={!bankAccountId || isCashAccount}
+                                className={`${inputCls} ${fieldErrors.paymentMode ? "border-red-400" : ""} ${(!bankAccountId || isCashAccount) ? "opacity-70 cursor-not-allowed" : ""}`}
+                            >
+                                <option value="">{bankAccountId ? "Select mode" : "Select account first"}</option>
+                                {modeOptions.map((m) => (
+                                    <option key={m.value} value={m.value}>{m.label}</option>
+                                ))}
+                            </select>
+                            {fieldErrors.paymentMode && <p className="mt-1 text-xs text-red-500">{fieldErrors.paymentMode}</p>}
+                        </div>
+                        {paymentMode && paymentMode !== "CASH" && (
+                            <div>
+                                {paymentModeRequiresRef(paymentMode) ? (
+                                    <label className={labelCls}>
+                                        <span className="text-red-500 mr-0.5">*</span>{paymentRefLabel(paymentMode)}
+                                    </label>
+                                ) : (
+                                    <label className={labelCls}>{paymentRefLabel(paymentMode)}</label>
+                                )}
+                                <input
+                                    type="text"
+                                    value={paymentRef}
+                                    onChange={(e) => {
+                                        setPaymentRef(e.target.value);
+                                        clearFieldError("paymentRef");
+                                    }}
+                                    placeholder={paymentMode === "CHEQUE" ? "e.g. 0123456" : "e.g. TXN-98765"}
+                                    maxLength={100}
+                                    className={`${inputCls} ${fieldErrors.paymentRef ? "border-red-400" : ""}`}
+                                />
+                                {fieldErrors.paymentRef && <p className="mt-1 text-xs text-red-500">{fieldErrors.paymentRef}</p>}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
                         <div>
                             <label className={labelCls}>
                                 <span className="text-red-500 mr-0.5">*</span>Fiscal Year
@@ -202,99 +278,99 @@ export default function PayTds() {
                         </div>
                     </div>
 
-                    {!fiscalYear ? (
-                        <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-lg">
-                            Enter a fiscal year to see unpaid TDS entries.
-                        </div>
-                    ) : loading ? (
-                        <div className="text-center py-12 text-slate-500">Loading unpaid entries...</div>
-                    ) : entries.length === 0 ? (
-                        <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-lg">
-                            No unpaid TDS entries for fiscal year {fiscalYear}.
-                        </div>
-                    ) : (
-                        // <div className="overflow-x-auto border border-gray-100 rounded-lg">
-                        //     <table className="w-full text-sm">
-                        //         <thead>
-                        //             <tr className="bg-slate-700 text-white">
-                        //                 <th className="px-3 py-2 w-8">
-                        //                     <input
-                        //                         type="checkbox"
-                        //                         checked={selectedIds.length === entries.length}
-                        //                         onChange={toggleAll}
-                        //                     />
-                        //                 </th>
-                        //                 <th className="px-4 py-2 text-left">Date</th>
-                        //                 <th className="px-4 py-2 text-left">Party</th>
-                        //                 <th className="px-4 py-2 text-left">Type</th>
-                        //                 <th className="px-4 py-2 text-right">Amount</th>
-                        //             </tr>
-                        //         </thead>
-                        //         <tbody>
-                        //             {entries.map((entry, idx) => (
-                        //                 <tr
-                        //                     key={entry.id}
-                        //                     onClick={() => toggleEntry(entry.id)}
-                        //                     className={`cursor-pointer ${idx % 2 === 0 ? "bg-white" : "bg-slate-50"} border-b border-slate-100 hover:bg-slate-100`}
-                        //                 >
-                        //                     <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                        //                         <input type="checkbox" checked={selectedIds.includes(entry.id)} onChange={() => toggleEntry(entry.id)} />
-                        //                     </td>
-                        //                     <td className="px-4 py-2">{entry.date}</td>
-                        //                     <td className="px-4 py-2">{entry.contact_name}</td>
-                        //                     <td className="px-4 py-2">{entry.tds_type}</td>
-                        //                     <td className="px-4 py-2 text-right">{fmt(entry.tds_amount)}</td>
-                        <div>
-                            <div className={`overflow-x-auto border rounded-lg ${fieldErrors.entries ? "border-red-400" : "border-gray-100"}`}>
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="bg-slate-700 text-white">
-                                            <th className="px-3 py-2 w-8">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedIds.length === entries.length}
-                                                    onChange={toggleAll}
-                                                />
-                                            </th>
-                                            <th className="px-4 py-2 text-left">Date</th>
-                                            <th className="px-4 py-2 text-left">Party</th>
-                                            <th className="px-4 py-2 text-left">Type</th>
-                                            <th className="px-4 py-2 text-right">Amount</th>
-                                        </tr>
-                                    {/* ))} */}
-                                    </thead>
-                                    <tbody>
-                                        {entries.map((entry, idx) => (
-                                            <tr
-                                                key={entry.id}
-                                                onClick={() => toggleEntry(entry.id)}
-                                                className={`cursor-pointer ${idx % 2 === 0 ? "bg-white" : "bg-slate-50"} border-b border-slate-100 hover:bg-slate-100`}
-                                            >
-                                                <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                                                    <input type="checkbox" checked={selectedIds.includes(entry.id)} onChange={() => toggleEntry(entry.id)} />
-                                                </td>
-                                                <td className="px-4 py-2">{entry.date}</td>
-                                                <td className="px-4 py-2">{entry.contact_name}</td>
-                                                <td className="px-4 py-2">{entry.tds_type}</td>
-                                                <td className="px-4 py-2 text-right">{fmt(entry.tds_amount)}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                    {fiscalYear && (
+                        loading ? (
+                            <div className="text-center py-12 text-slate-500">Loading unpaid entries...</div>
+                        ) : entries.length === 0 ? (
+                            <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-lg">
+                                No unpaid TDS entries for fiscal year {fiscalYear}.
                             </div>
-                            {fieldErrors.entries && <p className="mt-1 text-xs text-red-500">{fieldErrors.entries}</p>}
-                        </div>
+                        ) : (
+                            // <div className="overflow-x-auto border border-gray-100 rounded-lg">
+                            //     <table className="w-full text-sm">
+                            //         <thead>
+                            //             <tr className="bg-slate-700 text-white">
+                            //                 <th className="px-3 py-2 w-8">
+                            //                     <input
+                            //                         type="checkbox"
+                            //                         checked={selectedIds.length === entries.length}
+                            //                         onChange={toggleAll}
+                            //                     />
+                            //                 </th>
+                            //                 <th className="px-4 py-2 text-left">Date</th>
+                            //                 <th className="px-4 py-2 text-left">Party</th>
+                            //                 <th className="px-4 py-2 text-left">Type</th>
+                            //                 <th className="px-4 py-2 text-right">Amount</th>
+                            //             </tr>
+                            //         </thead>
+                            //         <tbody>
+                            //             {entries.map((entry, idx) => (
+                            //                 <tr
+                            //                     key={entry.id}
+                            //                     onClick={() => toggleEntry(entry.id)}
+                            //                     className={`cursor-pointer ${idx % 2 === 0 ? "bg-white" : "bg-slate-50"} border-b border-slate-100 hover:bg-slate-100`}
+                            //                 >
+                            //                     <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                            //                         <input type="checkbox" checked={selectedIds.includes(entry.id)} onChange={() => toggleEntry(entry.id)} />
+                            //                     </td>
+                            //                     <td className="px-4 py-2">{entry.date}</td>
+                            //                     <td className="px-4 py-2">{entry.contact_name}</td>
+                            //                     <td className="px-4 py-2">{entry.tds_type}</td>
+                            //                     <td className="px-4 py-2 text-right">{fmt(entry.tds_amount)}</td>
+                            <div>
+                                <div className={`overflow-x-auto border rounded-lg ${fieldErrors.entries ? "border-red-400" : "border-gray-100"}`}>
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="bg-slate-700 text-white">
+                                                <th className="px-3 py-2 w-8">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedIds.length === entries.length}
+                                                        onChange={toggleAll}
+                                                    />
+                                                </th>
+                                                <th className="px-4 py-2 text-left">Date</th>
+                                                <th className="px-4 py-2 text-left">Party</th>
+                                                <th className="px-4 py-2 text-left">Type</th>
+                                                <th className="px-4 py-2 text-right">Amount</th>
+                                            </tr>
+                                        {/* ))} */}
+                                        </thead>
+                                        <tbody>
+                                            {entries.map((entry, idx) => (
+                                                <tr
+                                                    key={entry.id}
+                                                    onClick={() => toggleEntry(entry.id)}
+                                                    className={`cursor-pointer ${idx % 2 === 0 ? "bg-white" : "bg-slate-50"} border-b border-slate-100 hover:bg-slate-100`}
+                                                >
+                                                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                                                        <input type="checkbox" checked={selectedIds.includes(entry.id)} onChange={() => toggleEntry(entry.id)} />
+                                                    </td>
+                                                    <td className="px-4 py-2">{entry.date}</td>
+                                                    <td className="px-4 py-2">{entry.contact_name}</td>
+                                                    <td className="px-4 py-2">{entry.tds_type}</td>
+                                                    <td className="px-4 py-2 text-right">{fmt(entry.tds_amount)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {fieldErrors.entries && <p className="mt-1 text-xs text-red-500">{fieldErrors.entries}</p>}
+                            </div>
+                        )
                     )}
 
-                    <div>
-                        <label className={labelCls}>Notes</label>
-                        <textarea
-                            value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
-                            placeholder="Internal notes..."
-                            rows={3}
-                            className={`${inputCls} resize-none`}
-                        />
+                    <div className="grid grid-cols-3 gap-4">
+                        <div>
+                            <label className={labelCls}>Notes</label>
+                            <textarea
+                                value={notes}
+                                onChange={(e) => setNotes(e.target.value)}
+                                placeholder="Internal notes..."
+                                rows={5}
+                                className={`${inputCls} resize-none`}
+                            />
+                        </div>
                     </div>
 
                     <div className="flex items-center justify-between pt-4 border-t border-gray-100">

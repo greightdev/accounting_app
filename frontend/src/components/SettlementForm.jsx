@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
-import { validateRequiredDate, validateRequiredSelect, validatePositiveNumber, validateFiscalYear } from "../utils/validators";
+import { validateRequiredDate, validateRequiredSelect, validatePositiveNumber, validateFiscalYear, validatePaymentMode, validatePaymentRef } from "../utils/validators";
+import { PAYMENT_MODES, NON_CASH_PAYMENT_MODES, paymentModeRequiresRef, paymentRefLabel } from "../constants/paymentModes";
 
 const labelCls = "block text-sm font-medium text-gray-700 mb-1.5";
 const inputCls = "w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition";
@@ -48,6 +49,8 @@ export default function SettlementForm({
     const [documentId, setDocumentId] = useState(""); // invoice_id or bill_id
     const [date, setDate] = useState(toLocalDate(new Date()));
     const [bankAccountId, setBankAccountId] = useState("");
+    const [paymentMode, setPaymentMode] = useState("");
+    const [paymentRef, setPaymentRef] = useState("");
 
     const [amountReceived, setAmountReceived] = useState("");
     const [fiscalYearVal, setFiscalYearVal] = useState(fiscalYear);
@@ -66,6 +69,23 @@ export default function SettlementForm({
     );
 
     const selectedContact = contacts.find((c) => String(c.id) === String(contactId));
+    const selectedBankAccount = bankAccounts.find((ba) => String(ba.id) === String(bankAccountId));
+    const isCashAccount = selectedBankAccount?.account_type === "CASH";
+    const modeOptions = isCashAccount ? PAYMENT_MODES.filter((m) => m.value === "CASH") : NON_CASH_PAYMENT_MODES;
+
+    const handleBankAccountChange = (value) => {
+        setBankAccountId(value);
+        clearFieldError("bankAccount");
+        const account = bankAccounts.find((ba) => String(ba.id) === String(value));
+        if (account?.account_type === "CASH") {
+            setPaymentMode("CASH");
+            setPaymentRef("");
+            clearFieldError("paymentRef");
+        } else if (paymentMode === "CASH") {
+            setPaymentMode("");
+        }
+        clearFieldError("paymentMode");
+    };
 
     // When contact changes, fetch their open invoices / bills
     useEffect(() => {
@@ -130,6 +150,12 @@ export default function SettlementForm({
         const bankErr = validateRequiredSelect(bankAccountId, { label: isReceipt ? "Received into account" : "Paid from account" });
         if (bankErr) errors.bankAccount = bankErr;
 
+        const modeErr = validatePaymentMode(paymentMode);
+        if (modeErr) errors.paymentMode = modeErr;
+
+        const refErr = validatePaymentRef(paymentRef, { mode: paymentMode, required: paymentModeRequiresRef(paymentMode) });
+        if (refErr) errors.paymentRef = refErr;
+
         const amountErr = validatePositiveNumber(amountReceived, { label: isReceipt ? "Amount received" : "Amount paid" });
         if (amountErr) errors.amount = amountErr;
 
@@ -159,6 +185,8 @@ export default function SettlementForm({
             contact_id: parseInt(contactId),
             date,
             bank_account_id: parseInt(bankAccountId),
+            payment_mode: paymentMode,
+            payment_ref: paymentRef.trim() || null,
             notes,
             ...(isReceipt ? {
                 amount_received: parseFloat(amountReceived),
@@ -283,16 +311,13 @@ export default function SettlementForm({
                     </div>
                 </div>
 
-                {/* Bank account + Amount */}
+                {/* Bank account + Mode + Amount */}
                 <div className="grid grid-cols-3 gap-4">
                     <div>
                         <RequiredLabel>{isReceipt ? "Received Into" : "Paid From"}</RequiredLabel>
                         <select
                             value={bankAccountId}
-                            onChange={(e) => {
-                                setBankAccountId(e.target.value);
-                                clearFieldError("bankAccount");
-                            }}
+                            onChange={(e) => handleBankAccountChange(e.target.value)}
                             className={`${inputCls} ${fieldErrors.bankAccount ? "border-red-400" : ""}`}
                         >
                             <option value="">Select account</option>
@@ -303,6 +328,28 @@ export default function SettlementForm({
                         {fieldErrors.bankAccount && <p className="mt-1 text-xs text-red-500">{fieldErrors.bankAccount}</p>}
                     </div>
 
+                    <div>
+                        <RequiredLabel>Mode</RequiredLabel>
+                        <select
+                            value={paymentMode}
+                            onChange={(e) => {
+                                setPaymentMode(e.target.value);
+                                clearFieldError("paymentMode");
+                                clearFieldError("paymentRef");
+                            }}
+                            disabled={!bankAccountId || isCashAccount}
+                            className={`${inputCls} ${fieldErrors.paymentMode ? "border-red-400" : ""} ${(!bankAccountId || isCashAccount) ? "opacity-70 cursor-not-allowed" : ""}`}
+                        >
+                            <option value="">{bankAccountId ? "Select mode" : "Select account first"}</option>
+                            {modeOptions.map((m) => (
+                                <option key={m.value} value={m.value}>{m.label}</option>
+                            ))}
+                        </select>
+                        {fieldErrors.paymentMode && <p className="mt-1 text-xs text-red-500">{fieldErrors.paymentMode}</p>}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
                     {/* Amount */}
                     <div>
                         <RequiredLabel>{isReceipt ? "Amount Received" : "Amount Paid"}</RequiredLabel>
@@ -329,6 +376,28 @@ export default function SettlementForm({
                             )
                         )}
                     </div>
+
+                    {paymentMode && paymentMode !== "CASH" && (
+                        <div>
+                            {paymentModeRequiresRef(paymentMode) ? (
+                                <RequiredLabel>{paymentRefLabel(paymentMode)}</RequiredLabel>
+                            ) : (
+                                <label className={labelCls}>{paymentRefLabel(paymentMode)}</label>
+                            )}
+                            <input
+                                type="text"
+                                value={paymentRef}
+                                onChange={(e) => {
+                                    setPaymentRef(e.target.value);
+                                    clearFieldError("paymentRef");
+                                }}
+                                placeholder={paymentMode === "CHEQUE" ? "e.g. 0123456" : "e.g. TXN-98765"}
+                                maxLength={100}
+                                className={`${inputCls} ${fieldErrors.paymentRef ? "border-red-400" : ""}`}
+                            />
+                            {fieldErrors.paymentRef && <p className="mt-1 text-xs text-red-500">{fieldErrors.paymentRef}</p>}
+                        </div>
+                    )}
 
                     {tdsApplies && (
                         <div>

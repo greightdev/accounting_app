@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { can } from "../permissions";
-import { validateRequiredDate, validateRequiredSelect, validatePositiveNumber } from "../utils/validators";
+import { validateRequiredDate, validateRequiredSelect, validatePositiveNumber, validatePaymentMode, validatePaymentRef } from "../utils/validators";
+import { NON_CASH_PAYMENT_MODES, paymentModeRequiresRef, paymentRefLabel } from "../constants/paymentModes";
 
 const labelCls = "block text-sm font-medium text-gray-700 mb-1.5";
 const inputCls = "w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition";
@@ -55,6 +56,8 @@ export default function BankTransferForm({
     const [bankAccountId, setBankAccountId] = useState(initialData?.bank_account_id != null ? String(initialData.bank_account_id) : "");
     const [contraAccountId, setContraAccountId] = useState(initialData?.contra_account_id != null ? String(initialData.contra_account_id) : "");
     const [amount, setAmount] = useState(initialData?.total_amount != null ? String(initialData.total_amount) : "");
+    const [paymentMode, setPaymentMode] = useState(initialData?.payment_mode ?? "");
+    const [paymentRef, setPaymentRef] = useState(initialData?.payment_ref ?? "");
     const [notes, setNotes] = useState(initialData?.notes ?? "");
     const [formError, setFormError] = useState("");
     const [fieldErrors, setFieldErrors] = useState({});
@@ -91,6 +94,12 @@ export default function BankTransferForm({
         const bankErr = validateRequiredSelect(bankAccountId, { label: "Bank account" });
         if (bankErr) errors.bankAccount = bankErr;
 
+        const modeErr = validatePaymentMode(paymentMode);
+        if (modeErr) errors.paymentMode = modeErr;
+
+        const refErr = validatePaymentRef(paymentRef, { mode: paymentMode, required: paymentModeRequiresRef(paymentMode) });
+        if (refErr) errors.paymentRef = refErr;
+
         const contraLabel = isDeposit ? "Source account" : "Destination account";
         const contraErr = validateRequiredSelect(contraAccountId, { label: contraLabel });
         if (contraErr) errors.contraAccount = contraErr;
@@ -117,6 +126,8 @@ export default function BankTransferForm({
             ...(isEditing ? { id: initialData.id } : {}),
             date,
             bank_account_id: parseInt(bankAccountId),
+            payment_mode: paymentMode,
+            payment_ref: paymentRef.trim() || null,
             account_id: parseInt(contraAccountId),
             amount: parseFloat(amount),
             notes,
@@ -210,7 +221,27 @@ export default function BankTransferForm({
                         </select>
                         {fieldErrors.contraAccount && <p className="mt-1 text-xs text-red-500">{fieldErrors.contraAccount}</p>}
                     </div>
+
+                    <div>
+                        <RequiredLabel>Mode</RequiredLabel>
+                        <select
+                            value={paymentMode}
+                            onChange={(e) => {
+                                setPaymentMode(e.target.value);
+                                clearFieldError("paymentMode");
+                                clearFieldError("paymentRef");
+                            }}
+                            className={`${inputCls} ${fieldErrors.paymentMode ? "border-red-400" : ""}`}
+                        >
+                            <option value="">Select mode</option>
+                            {NON_CASH_PAYMENT_MODES.map((m) => (
+                                <option key={m.value} value={m.value}>{m.label}</option>
+                            ))}
+                        </select>
+                        {fieldErrors.paymentMode && <p className="mt-1 text-xs text-red-500">{fieldErrors.paymentMode}</p>}
+                    </div>
                 </div>
+
                 <div className="grid grid-cols-3 gap-4">
                     <div>
                         <RequiredLabel>Amount</RequiredLabel>
@@ -228,6 +259,28 @@ export default function BankTransferForm({
                         />
                         {fieldErrors.amount && <p className="mt-1 text-xs text-red-500">{fieldErrors.amount}</p>}
                     </div>
+
+                    {paymentMode && (
+                        <div>
+                            {paymentModeRequiresRef(paymentMode) ? (
+                                <RequiredLabel>{paymentRefLabel(paymentMode)}</RequiredLabel>
+                            ) : (
+                                <label className={labelCls}>{paymentRefLabel(paymentMode)}</label>
+                            )}
+                            <input
+                                type="text"
+                                value={paymentRef}
+                                onChange={(e) => {
+                                    setPaymentRef(e.target.value);
+                                    clearFieldError("paymentRef");
+                                }}
+                                placeholder={paymentMode === "CHEQUE" ? "e.g. 0123456" : "e.g. TXN-98765"}
+                                maxLength={100}
+                                className={`${inputCls} ${fieldErrors.paymentRef ? "border-red-400" : ""}`}
+                            />
+                            {fieldErrors.paymentRef && <p className="mt-1 text-xs text-red-500">{fieldErrors.paymentRef}</p>}
+                        </div>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">

@@ -207,6 +207,19 @@ export function validateFiscalYear(value, { required = true } = {}) {
     return "";
 }
 
+// Payment mode + cheque/transaction reference (Receipts, Payments, Deposits/Withdrawals, TDS Payment)
+export function validatePaymentMode(value, { label = "Payment mode" } = {}) {
+    if (!value) return `${label} is required.`;
+    return "";
+}
+
+export function validatePaymentRef(value, { mode, required = false, label = "Cheque number / transaction ID" } = {}) {
+    const v = (value ?? "").trim();
+    if (!v) return required ? `${label} is required for ${mode ? mode.toLowerCase().replace(/_/g, " ") : "this"} payments.` : "";
+    if (v.length > 100) return `${label} must be 100 characters or fewer.`;
+    return "";
+}
+
 // Accounts
 export function validateGenericName(value, { required = true, label = "Name", maxLen = 150 } = {}) {
     const v = (value ?? "").trim();
