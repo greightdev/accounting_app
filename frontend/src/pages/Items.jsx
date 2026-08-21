@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Search, SquarePen, Trash2 } from "lucide-react";
 import Toolbar from "../components/Toolbar";
+import Tabs from "../components/Tabs";
 import DataTable from "../components/DataTable";
 import Modal from "../components/Modal";
 import api from "../api/axios";
@@ -9,6 +10,12 @@ import useToast from "../hooks/useToast";
 import { validateItemName, validateUnit, validateHsnSac, validatePrice, validateRequiredSelect, filterItemNameInput, filterUnitInput, filterDigitsOnly, filterDecimalInput } from "../utils/validators";
 import { useAuth } from "../context/AuthContext";
 import { can } from "../permissions";
+
+const DEFAULT_TABS = [
+    { key: "All", label: "All" },
+    { key: "Selling", label: "Selling" },
+    { key: "Purchase", label: "Purchase" },
+];
 
 const emptyForm = {
     name: '',
@@ -26,8 +33,8 @@ export default function Items() {
     const [items, setItems] = useState([]);
     const [vendors, setVendors] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState('All');
     const [search, setSearch] = useState('');
+    const [tab, setTab] = useState("All");
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalType, setModalType] = useState('selling'); // 'selling' | 'purchase'
@@ -40,7 +47,7 @@ export default function Items() {
 
     useEffect(() => {
         fetchItems();
-    }, [filter]);
+    }, [tab]);
 
     useEffect(() => {
         fetchVendors();
@@ -51,7 +58,7 @@ export default function Items() {
     const fetchItems = async () => {
         setLoading(true);
         try {
-            const typeParam = filterToType[filter];
+            const typeParam = filterToType[tab];
             const query = typeParam ? `?type=${typeParam}` : '';
             const { data } = await api.get(`/items/list.php${query}`);
             setItems(data.data ?? []);
@@ -290,12 +297,14 @@ export default function Items() {
 
             <Toolbar
                 search={{ value: search, onChange: setSearch }}
-                filters={{ options: ['All', 'Selling', 'Purchase'], active: filter, onChange: setFilter }}
+                // filters={{ options: ['All', 'Selling', 'Purchase'], active: filter, onChange: setFilter }}
                 actions={[
                     { label: '+ Selling Item', onClick: () => openCreateModal('selling') },
                     { label: '+ Purchase Item', onClick: () => openCreateModal('purchase') },
                 ]}
             />
+
+            <Tabs tabs={DEFAULT_TABS} active={tab} onChange={setTab} />
 
             <div className="bg-white rounded-lg shadow">
                 <DataTable
