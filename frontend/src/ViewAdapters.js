@@ -1,3 +1,21 @@
+const PAYMENT_MODE_LABELS = {
+    CASH: "Cash",
+    CHEQUE: "Cheque",
+    BANK_TRANSFER: "Bank Transfer",
+    CONNECT_IPS: "ConnectIPS",
+    ESEWA: "eSewa",
+};
+
+function paymentModeSummaryRows(tx) {
+    if (!tx.payment_mode) return [];
+    const modeLabel = PAYMENT_MODE_LABELS[tx.payment_mode] ?? tx.payment_mode;
+    const refLabel = tx.payment_mode === "CHEQUE" ? "Cheque No." : "Transaction ID";
+    return [
+        { label: "Payment Mode", value: modeLabel, raw: true },
+        ...(tx.payment_ref ? [{ label: refLabel, value: tx.payment_ref, raw: true }] : []),
+    ];
+}
+
 export function adaptTransactionForView(tx) {
     switch (tx.type) {
         case 'SALES':
@@ -19,7 +37,10 @@ export function adaptTransactionForView(tx) {
                 refNumber: tx.ref_number,
                 date: tx.date,
                 status: tx.status,
-                summaryRows: [{ label: 'Amount', value: tx.total_amount, emphasize: true }],
+                summaryRows: [
+                    { label: 'Amount', value: tx.total_amount, emphasize: true },
+                    ...paymentModeSummaryRows(tx),
+                ],
                 notes: tx.notes,
                 preparedBy: tx.created_by_name,
             };
@@ -62,6 +83,7 @@ export function adaptSettlementForView(tx, isReceipt) {
         summaryRows: [
             { label: isReceipt ? "Amount Received" : "Amount Paid", value: tx.total_amount, emphasize: true },
             ...(tx.tds_amount > 0 ? [{ label: "TDS Deducted", value: tx.tds_amount }] : []),
+            ...paymentModeSummaryRows(tx),
         ],
         notes: tx.notes,
         preparedBy: tx.created_by_name,
@@ -76,6 +98,10 @@ export function adaptBankTransferForView(tx) {
         refNumber: tx.ref_number,
         date: tx.date,
         status: tx.status,
+        summaryRows: [
+            { label: "Amount", value: tx.total_amount, emphasize: true },
+            ...paymentModeSummaryRows(tx),
+        ],
         ledgerRows: [
             {
                 account: isDeposit ? tx.bank_account_name : tx.contra_account_name,

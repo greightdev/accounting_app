@@ -13,7 +13,7 @@ const fmt = (n) => (n || n === 0 ? Number(n).toLocaleString(undefined, { minimum
  * @param {object}   party           optional — { label, name, pan, address }
  * @param {object[]} lineItems       optional — [{ description, quantity, rate, taxRate, amount }]
  * @param {object[]} ledgerRows      optional — [{ account, debit, credit, narration }]
- * @param {object[]} summaryRows     optional — [{ label, value, emphasize? }]
+ * @param {object[]} summaryRows     optional — [{ label, value, emphasize?, raw? }] — raw:true renders value as plain text instead of running it through number formatting (e.g. Payment Mode, Cheque No.)
  * @param {string}   notes
  * @param {function} onClose
  */
@@ -162,7 +162,7 @@ export default function TransactionView({
                                         className={`flex items-center justify-between ${row.emphasize ? "text-base font-bold pt-2 border-t border-gray-300" : "text-gray-600"}`}
                                     >
                                         <span>{row.label}</span>
-                                        <span>{fmt(row.value)}</span>
+                                        <span>{row.raw ? (row.value ?? "-") : fmt(row.value)}</span>
                                     </div>
                                 ))}
                             </div>
