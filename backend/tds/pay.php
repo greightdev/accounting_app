@@ -4,6 +4,7 @@ require_once '../server.php';
 require_once '../db.php';
 require_once '../includes/auth.php';
 require_once '../includes/audit.php';
+require_once '../includes/payment_mode.php';
 
 requireRole(['admin', 'accountant']);
 
@@ -32,10 +33,13 @@ $bankAccountId = $data['bank_account_id'] ?? null;
 $tdsEntryIds = $data['tds_entry_ids'] ?? []; // which tds_entries are being paid
 $fiscalYear = $data['fiscal_year'] ?? '';
 $notes = trim($data['notes'] ?? '');
+$paymentMode = $data['payment_mode'] ?? '';
+$paymentRef = trim($data['payment_ref'] ?? '');
 
 $errors = [];
 if (empty($date)) $errors[] = "Date is required.";
 if (!$bankAccountId) $errors[] = "Bank account is required.";
+if (!in_array($paymentMode, validPaymentModes(), true)) $errors[] = "A valid payment mode is required.";
 if (empty($tdsEntryIds)) $errors[] = "At least one TDS entry must be selected.";
 if (empty($fiscalYear)) $errors[] = "Fiscal year is required.";
 
@@ -51,7 +55,7 @@ if ($errors) {
 try {
     // Validate bank account
     $bankStmt = $pdo->prepare("
-        SELECT ba.id, ba.account_id AS ledger_account_id
+        SELECT ba.id, ba.account_id AS ledger_account_id, ba.account_type
         FROM bank_accounts ba
         WHERE ba.id = ? AND ba.is_active = TRUE
     ");
@@ -63,6 +67,16 @@ try {
         echo json_encode([
             "success" => false,
             "message" => "Bank account not found."
+        ]);
+        exit();
+    }
+
+    $modeErrors = validatePaymentModeAndRef($paymentMode, $paymentRef, $bank['account_type']);
+    if ($modeErrors) {
+        http_response_code(400);
+        echo json_encode([
+            "success" => false,
+            "message" => implode(' ', $modeErrors)
         ]);
         exit();
     }
@@ -132,17 +146,21 @@ try {
             date,
             ref_number,
             bank_account_id,
+            payment_mode,
+            payment_ref,
             total_amount,
             notes,
             status,
             created_by
         )
-        VALUES ('TDS_PAYMENT', ?, ?, ?, ?, ?, 'APPROVED', ?)
+        VALUES ('TDS_PAYMENT', ?, ?, ?, ?, ?, ?, ?, 'APPROVED', ?)
     ");
     $txStmt->execute([
         $date,
         $refNumber,
         $bankAccountId,
+        $paymentMode,
+        $paymentRef ?: null,
         $totalTds,
         $notes ?: "TDS payment to government for fiscal year {$fiscalYear}",
         $_SESSION['user_id'],
@@ -188,7 +206,7 @@ try {
         'transactions',
         $txId,
         null,
-        ['type' => 'TDS_PAYMENT', 'ref_number' => $refNumber, 'bank_account_id' => (int)$bankAccountId, 'total_amount' => $totalTds, 'fiscal_year' => $fiscalYear, 'tds_entry_ids' => array_column($tdsEntries, 'id')]
+        ['type' => 'TDS_PAYMENT', 'ref_number' => $refNumber, 'bank_account_id' => (int)$bankAccountId, 'payment_mode' => $paymentMode, 'payment_ref' => $paymentRef ?: null, 'total_amount' => $totalTds, 'fiscal_year' => $fiscalYear, 'tds_entry_ids' => array_column($tdsEntries, 'id')]
     );
 
     http_response_code(201);

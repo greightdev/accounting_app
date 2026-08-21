@@ -4,6 +4,7 @@ require_once '../server.php';
 require_once '../db.php';
 require_once '../includes/auth.php';
 require_once '../includes/audit.php';
+require_once '../includes/payment_mode.php';
 
 requireRole(['admin', 'accountant']);
 
@@ -36,6 +37,8 @@ $accountId = $data['account_id'] ?? null;
 $amount = $data['amount'] ?? 0;
 $notes = trim($data['notes'] ?? '');
 $status = $data['status'] ?? 'DRAFT';
+$paymentMode = $data['payment_mode'] ?? '';
+$paymentRef = trim($data['payment_ref'] ?? '');
 
 if ($_SESSION['role'] !== 'admin') {
     $status = 'DRAFT';
@@ -52,6 +55,7 @@ if (!in_array($type, ['BANK_DEP', 'BANK_WITH'], true)) {
 if (empty($date)) $errors[] = "Date is required.";
 if (!$bankAccountId) $errors[] = "Bank account is required.";
 if (!$accountId) $errors[] = "Offsetting account (Cash or Expense) is required.";
+if (!in_array($paymentMode, validPaymentModes(), true)) $errors[] = "A valid payment mode is required.";
 if ((float)$amount <= 0) $errors[] = "Amount must be greater than zero.";
 if (!in_array($status, $validStatuses, true)) $errors[] = "Status must be DRAFT or APPROVED.";
 
@@ -67,7 +71,7 @@ if ($errors) {
 try {
     // Fetch the bank account's linked ledger account id
     $bankStmt = $pdo->prepare("
-        SELECT ba.id, ba.account_id AS ledger_account_id, a.name AS account_name
+        SELECT ba.id, ba.account_id AS ledger_account_id, ba.account_type, a.name AS account_name
         FROM bank_accounts ba
         JOIN accounts a ON a.id = ba.account_id
         WHERE ba.id = ? AND ba.is_active = TRUE
@@ -80,6 +84,16 @@ try {
         echo json_encode([
             "success" => false,
             "message" => "Bank account not found."
+        ]);
+        exit();
+    }
+
+    $modeErrors = validatePaymentModeAndRef($paymentMode, $paymentRef, $bank['account_type']);
+    if ($modeErrors) {
+        http_response_code(400);
+        echo json_encode([
+            "success" => false,
+            "message" => implode(' ', $modeErrors)
         ]);
         exit();
     }
@@ -132,19 +146,23 @@ try {
             date,
             ref_number,
             bank_account_id,
+            payment_mode,
+            payment_ref,
             contra_account_id,
             total_amount,
             notes,
             status,
             created_by
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     $txStmt->execute([
         $type,
         $date,
         $refNumber,
         $bankAccountId,
+        $paymentMode,
+        $paymentRef ?: null,
         $accountId,
         $amount,
         $notes ?: null,
@@ -193,7 +211,7 @@ try {
         'transactions',
         $txId,
         null,
-        ['type' => $type, 'ref_number' => $refNumber, 'bank_account_id' => (int)$bankAccountId, 'account_id' => (int)$accountId, 'amount' => (float)$amount, 'status' => $status]
+        ['type' => $type, 'ref_number' => $refNumber, 'bank_account_id' => (int)$bankAccountId, 'payment_mode' => $paymentMode, 'payment_ref' => $paymentRef ?: null, 'account_id' => (int)$accountId, 'amount' => (float)$amount, 'status' => $status]
     );
 
     http_response_code(201);
