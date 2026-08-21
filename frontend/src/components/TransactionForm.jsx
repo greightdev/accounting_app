@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X, ChevronRight, ChevronDown, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { can } from "../permissions";
@@ -176,6 +176,23 @@ export default function TransactionForm({
 
     const filteredContacts = contacts.filter((c) => contactTypes.includes(c.type));
     const employees = contacts.filter((c) => c.type === "Employee");
+
+    const availableItems = priceField === "purchase_rate"
+        ? items.filter((i) => i.type === "PURCHASE" && String(i.vendor_id) === String(contact))
+        : items.filter((i) => i.type !== "PURCHASE");
+
+    useEffect(() => {
+        if (priceField !== "purchase_rate") return;
+        setLineItems((prev) =>
+            prev.map((row) => {
+                if (!row.itemId) return row;
+                const stillValid = items.some(
+                    (i) => String(i.id) === String(row.itemId) && String(i.vendor_id) === String(contact)
+                );
+                return stillValid ? row : { ...row, itemId: "", rate: "" };
+            })
+        );
+    }, [contact, priceField]);
 
     const handleSubmit = (approve) => {
         const errors = {};
@@ -418,10 +435,15 @@ export default function TransactionForm({
                                                 <select
                                                     value={row.itemId}
                                                     onChange={(e) => updateRow(row.id, "itemId", e.target.value)}
-                                                    className={cellInputCls}
+                                                    disabled={priceField === "purchase_rate" && !contact}
+                                                    className={`${cellInputCls} ${priceField === "purchase_rate" && !contact ? "opacity-50 cursor-not-allowed" : ""}`}
                                                 >
-                                                    <option value="">Item</option>
-                                                    {items.map((i) => (
+                                                    <option value="">
+                                                        {priceField === "purchase_rate" && !contact
+                                                            ? "Select a vendor first"
+                                                            : "Item"}
+                                                    </option>
+                                                    {availableItems.map((i) => (
                                                         <option key={i.id} value={i.id}>
                                                             {i.name}
                                                         </option>
