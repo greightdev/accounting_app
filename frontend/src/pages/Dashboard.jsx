@@ -110,16 +110,9 @@ export default function Dashboard() {
 
     return (
         <div className="space-y-8">
-            <div>
-                <h1 className="text-lg font-semibold text-gray-900">Dashboard</h1>
-                <p className="text-sm text-gray-500">
-                    This month: {summary.month_start} to {summary.month_end}
-                </p>
-            </div>
-
             {/* Sales & Purchase */}
             <div>
-                <h2 className="text-sm font-bold tracking-wide text-gray-500 uppercase mb-3">This Month</h2>
+                <h2 className="text-sm font-bold tracking-wide text-gray-500 uppercase mb-3">This Month ({summary.month_start} to {summary.month_end})</h2>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <StatCard label="Total Sales" value={fmt(summary.total_sales)} onClick={() => navigate("/reports/sales-register")} />
                     <StatCard label="Total Purchase" value={fmt(summary.total_purchase)} onClick={() => navigate("/reports/purchase-register")} />
