@@ -1,3 +1,5 @@
+import { formatBsDate } from "../utils/nepaliDate";
+
 export const SALES_REPORTS = {
     "sales-register": {
         title: "Sales Register",
@@ -11,7 +13,7 @@ export const SALES_REPORTS = {
             },
         ],
         columns: [
-            { key: "date", header: "Date" },
+            { key: "date", header: "Date", render: (r) => formatBsDate(r.date) },
             { key: "ref_number", header: "Ref #" },
             { key: "contact_name", header: "Customer" },
             { key: "contact_pan", header: "PAN", render: (r) => r.contact_pan ?? "-" },
@@ -58,7 +60,7 @@ export const SALES_REPORTS = {
             { key: "contact_id", label: "Customer", optionsEndpoint: "/contacts/list.php?type=Customer", required: false },
         ],
         columns: [
-            { key: "date", header: "Date" },
+            { key: "date", header: "Date", render: (r) => formatBsDate(r.date) },
             { key: "ref_number", header: "Invoice #" },
             { key: "item_name", header: "Name" },
             { key: "rate", header: "Rate", align: "right", render: (r) => Number(r.rate || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }) },

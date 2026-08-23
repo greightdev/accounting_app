@@ -1,3 +1,5 @@
+import { formatBsDate } from "../utils/nepaliDate";
+
 export const NEPALI_TAX_REPORTS = {
     "sales-account-np": {
         title: "बिक्री खाता (Sales Account)",
@@ -5,7 +7,7 @@ export const NEPALI_TAX_REPORTS = {
         datesRequired: true,
         columns: [
             { key: "sn", header: "S.N.", align: "right" },
-            { key: "bill_date", header: "Date" },
+            { key: "bill_date", header: "Date", render: (r) => formatBsDate(r.bill_date) },
             { key: "invoice_number", header: "Invoice #" },
             { key: "customer_name", header: "Customer" },
             { key: "customer_pan", header: "PAN" },
@@ -23,7 +25,7 @@ export const NEPALI_TAX_REPORTS = {
         datesRequired: true,
         columns: [
             { key: "sn", header: "S.N.", align: "right" },
-            { key: "bill_date", header: "Date" },
+            { key: "bill_date", header: "Date", render: (r) => formatBsDate(r.bill_date) },
             { key: "bill_number", header: "Bill #" },
             { key: "vendor_name", header: "Vendor" },
             { key: "vendor_pan", header: "PAN" },

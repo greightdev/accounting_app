@@ -3,6 +3,7 @@ import { X, ChevronRight, ChevronDown, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { can } from "../permissions";
 import { validateRequiredDate, validateDateNotBefore, validateRequiredSelect, validateLineItems } from "../utils/validators";
+import NepaliDateInput from "./NepaliDateInput";
 
 // TransactionForm — generic layout for any line-item document:
 // Sales Invoice, Purchase Bill, etc.
@@ -294,28 +295,27 @@ export default function TransactionForm({
                 <div className="grid grid-cols-3 gap-4">
                     <div>
                         <RequiredLabel>Date</RequiredLabel>
-                        <input
-                            type="date"
+                        <NepaliDateInput
                             value={date}
-                            onChange={(e) => {
-                                setDate(e.target.value);
+                            disableFuture
+                            onChange={(v) => {
+                                setDate(v);
                                 if (fieldErrors.date) setFieldErrors((prev) => ({ ...prev, date: "" }));
                             }}
-                            className={`${inputCls} ${fieldErrors.date ? "border-red-400" : ""}`}
+                            className={fieldErrors.date ? "border-red-400" : ""}
                         />
                         {fieldErrors.date && <p className="mt-1 text-xs text-red-500">{fieldErrors.date}</p>}
                     </div>
                     {showDueDate && (
                         <div>
                             <label className={labelCls}>Due Date</label>
-                            <input
-                                type="date"
+                            <NepaliDateInput
                                 value={dueDate}
-                                onChange={(e) => {
-                                    setDueDate(e.target.value);
+                                onChange={(v) => {
+                                    setDueDate(v);
                                     if (fieldErrors.dueDate) setFieldErrors((prev) => ({ ...prev, dueDate: "" }));
                                 }}
-                                className={`${inputCls} ${fieldErrors.dueDate ? "border-red-400" : ""}`}
+                                className={fieldErrors.dueDate ? "border-red-400" : ""}
                             />
                             {fieldErrors.dueDate && <p className="mt-1 text-xs text-red-500">{fieldErrors.dueDate}</p>}
                         </div>

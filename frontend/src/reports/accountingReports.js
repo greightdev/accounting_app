@@ -1,3 +1,5 @@
+import { formatBsDate } from "../utils/nepaliDate";
+
 export const ACCOUNTING_REPORTS = {
     "account-ledger": {
         title: "Account Ledger",
@@ -15,7 +17,7 @@ export const ACCOUNTING_REPORTS = {
             { key: "closing_balance", typeKey: "closing_balance_type", label: "Closing Balance" },
         ],
         columns: [
-            { key: "date", header: "Date" },
+            { key: "date", header: "Date", render: (r) => formatBsDate(r.date) },
             { key: "ref_number", header: "Ref #" },
             { key: "transaction_type", header: "Type" },
             { key: "narration", header: "Narration" },
@@ -42,7 +44,7 @@ export const ACCOUNTING_REPORTS = {
         columns: [
             { key: "account_code", header: "Code" },
             { key: "account_name", header: "Account" },
-            { key: "date", header: "Date" },
+            { key: "date", header: "Date", render: (r) => formatBsDate(r.date) },
             { key: "ref_number", header: "Ref #" },
             { key: "narration", header: "Narration" },
             { key: "debit", header: "Debit", align: "right", render: (r) => r.debit ? Number(r.debit).toLocaleString(undefined, { minimumFractionDigits: 2 }) : "-" },
@@ -112,7 +114,7 @@ export const ACCOUNTING_REPORTS = {
         title: "Day Book",
         endpoint: "/reports/accounting_reports/day_book.php",
         columns: [
-            { key: "date", header: "Date" },
+            { key: "date", header: "Date", render: (r) => formatBsDate(r.date) },
             { key: "ref_number", header: "Ref #" },
             { key: "transaction_type", header: "Type" },
             { key: "account_name", header: "Account" },

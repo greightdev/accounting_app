@@ -1,3 +1,5 @@
+import { formatBsDate } from "../utils/nepaliDate";
+
 export const TDS_REPORTS = {
     "tds-receivable": {
         title: "TDS Receivable",
@@ -11,7 +13,7 @@ export const TDS_REPORTS = {
             { key: "unpaid_tds", label: "Unpaid" },
         ],
         columns: [
-            { key: "date", header: "Date" },
+            { key: "date", header: "Date", render: (r) => formatBsDate(r.date) },
             { key: "ref_number", header: "Ref #" },
             { key: "customer_name", header: "Customer" },
             { key: "pan", header: "PAN", render: (r) => r.pan ?? "-" },
@@ -34,7 +36,7 @@ export const TDS_REPORTS = {
             { key: "unpaid_tds", label: "Unpaid" },
         ],
         columns: [
-            { key: "date", header: "Date" },
+            { key: "date", header: "Date", render: (r) => formatBsDate(r.date) },
             { key: "ref_number", header: "Ref #" },
             { key: "vendor_name", header: "Vendor" },
             { key: "pan", header: "PAN", render: (r) => r.pan ?? "-" },
@@ -57,7 +59,7 @@ export const TDS_REPORTS = {
             { key: "unpaid_expense", label: "Unpaid" },
         ],
         columns: [
-            { key: "date", header: "Date" },
+            { key: "date", header: "Date", render: (r) => formatBsDate(r.date) },
             { key: "ref_number", header: "Ref #" },
             { key: "customer_name", header: "Customer" },
             { key: "pan", header: "PAN", render: (r) => r.pan ?? "-" },
@@ -77,7 +79,7 @@ export const TDS_REPORTS = {
             { key: "total_expense", label: "Expense" },
         ],
         columns: [
-            { key: "date", header: "Date" },
+            { key: "date", header: "Date", render: (r) => formatBsDate(r.date) },
             { key: "ref_number", header: "Ref #" },
             { key: "party_name", header: "Party" },
             { key: "pan", header: "PAN" },

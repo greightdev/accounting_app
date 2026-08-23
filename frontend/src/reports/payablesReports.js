@@ -1,3 +1,5 @@
+import { formatBsDate } from "../utils/nepaliDate";
+
 export const PAYABLES_REPORTS = {
     "vendor-balances": {
         title: "Vendor Balances",
@@ -27,7 +29,7 @@ export const PAYABLES_REPORTS = {
         ],
         columns: [
             { key: "ref_number", header: "Bill #" },
-            { key: "bill_date", header: "Date" },
+            { key: "bill_date", header: "Date", render: (r) => formatBsDate(r.bill_date) },
             { key: "vendor_name", header: "Vendor" },
             { key: "billed_amount", header: "Billed", align: "right", render: (r) => Number(r.billed_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }) },
             { key: "outstanding", header: "Outstanding", align: "right", render: (r) => Number(r.outstanding || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }) },
@@ -47,7 +49,7 @@ export const PAYABLES_REPORTS = {
             { key: "balance_due", label: "Balance Due" },
         ],
         columns: [
-            { key: "date", header: "Date" },
+            { key: "date", header: "Date", render: (r) => formatBsDate(r.date) },
             { key: "ref_number", header: "Ref #" },
             { key: "type", header: "Type" },
             { key: "sub_total", header: "Taxable", align: "right", render: (r) => r.sub_total ? Number(r.sub_total).toLocaleString(undefined, { minimumFractionDigits: 2 }) : "-" },

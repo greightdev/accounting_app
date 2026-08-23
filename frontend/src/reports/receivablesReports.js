@@ -1,3 +1,5 @@
+import { formatBsDate } from "../utils/nepaliDate";
+
 export const RECEIVABLES_REPORTS = {
     "customer-balance": {
         title: "Customer Balance",
@@ -27,7 +29,7 @@ export const RECEIVABLES_REPORTS = {
         ],
         columns: [
             { key: "ref_number", header: "Invoice #" },
-            { key: "invoice_date", header: "Date" },
+            { key: "invoice_date", header: "Date", render: (r) => formatBsDate(r.invoice_date) },
             { key: "customer_name", header: "Customer" },
             { key: "invoiced_amount", header: "Invoiced", align: "right", render: (r) => Number(r.invoiced_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }) },
             { key: "outstanding", header: "Outstanding", align: "right", render: (r) => Number(r.outstanding || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }) },
@@ -47,7 +49,7 @@ export const RECEIVABLES_REPORTS = {
             { key: "balance_due", label: "Balance Due" },
         ],
         columns: [
-            { key: "date", header: "Date" },
+            { key: "date", header: "Date", render: (r) => formatBsDate(r.date) },
             { key: "ref_number", header: "Ref #" },
             { key: "type", header: "Type" },
             { key: "sub_total", header: "Taxable", align: "right", render: (r) => r.sub_total ? Number(r.sub_total).toLocaleString(undefined, { minimumFractionDigits: 2 }) : "-" },
@@ -72,7 +74,7 @@ export const RECEIVABLES_REPORTS = {
             { key: "closing_balance", typeKey: "closing_balance_type", label: "Closing Balance" },
         ],
         columns: [
-            { key: "date", header: "Date" },
+            { key: "date", header: "Date", render: (r) => formatBsDate(r.date) },
             { key: "ref_number", header: "Ref #" },
             { key: "transaction_type", header: "Type" },
             { key: "narration", header: "Narration" },
@@ -97,7 +99,7 @@ export const RECEIVABLES_REPORTS = {
             { key: "net_cash_received", label: "Net Cash Received" },
         ],
         columns: [
-            { key: "date", header: "Date" },
+            { key: "date", header: "Date", render: (r) => formatBsDate(r.date) },
             { key: "ref_number", header: "Ref #" },
             { key: "customer_name", header: "Customer" },
             { key: "bank_account_name", header: "Account", render: (r) => r.bank_account_name ?? "-" },

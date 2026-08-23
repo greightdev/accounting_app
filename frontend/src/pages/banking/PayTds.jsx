@@ -4,6 +4,7 @@ import Toast from "../../components/Toast";
 import useToast from "../../hooks/useToast";
 import { validateRequiredDate, validateRequiredSelect, validateFiscalYear, validatePaymentMode, validatePaymentRef } from "../../utils/validators";
 import { PAYMENT_MODES, NON_CASH_PAYMENT_MODES, paymentModeRequiresRef, paymentRefLabel } from "../../constants/paymentModes";
+import NepaliDateInput from "../../components/NepaliDateInput";
 
 const toLocalDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
@@ -183,14 +184,14 @@ export default function PayTds() {
                             <label className={labelCls}>
                                 <span className="text-red-500 mr-0.5">*</span>Date
                             </label>
-                            <input
-                                type="date"
+                            <NepaliDateInput
                                 value={date}
-                                onChange={(e) => {
-                                    setDate(e.target.value);
+                                disableFuture
+                                onChange={(v) => {
+                                    setDate(v);
                                     clearFieldError("date");
                                 }}
-                                className={`${inputCls} ${fieldErrors.date ? "border-red-400" : ""}`}
+                                className={fieldErrors.date ? "border-red-400" : ""}
                             />
                             {fieldErrors.date && <p className="mt-1 text-xs text-red-500">{fieldErrors.date}</p>}
                         </div>

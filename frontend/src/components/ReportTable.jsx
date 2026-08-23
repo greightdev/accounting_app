@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Download, FileSpreadsheet } from "lucide-react";
 import * as XLSX from "xlsx";
 import DataTable from "./DataTable";
+import NepaliDateInput from "./NepaliDateInput";
 
 export default function ReportTable({
     title,
@@ -74,18 +75,18 @@ export default function ReportTable({
                     
                     {dateMode === "range" && (
                         <>
-                            <input
-                                type="date"
+                            <NepaliDateInput
+                                compact
                                 value={dateFrom}
-                                onChange={(e) => setDateFrom(e.target.value)}
-                                className="px-3 py-1.5 rounded-md border border-gray-200 text-gray-600 text-sm"
+                                disableFuture
+                                onChange={setDateFrom}
                             />
                             <span className="text-gray-400 text-sm">to</span>
-                            <input
-                                type="date"
+                            <NepaliDateInput
+                                compact
                                 value={dateTo}
-                                onChange={(e) => setDateTo(e.target.value)}
-                                className="px-3 py-1.5 rounded-md border border-gray-200 text-gray-600 text-sm"
+                                disableFuture
+                                onChange={setDateTo}
                             />
                             <button
                                 onClick={applyFilter}
@@ -99,11 +100,11 @@ export default function ReportTable({
                     {dateMode === "asOf" && (
                         <>
                             <span className="text-gray-500 text-sm">As of</span>
-                            <input
-                                type="date"
+                            <NepaliDateInput
+                                compact
                                 value={asOf}
-                                onChange={(e) => setAsOf(e.target.value)}
-                                className="px-3 py-1.5 rounded-md border border-gray-200 text-gray-600 text-sm"
+                                disableFuture
+                                onChange={setAsOf}
                             />
                             <button
                                 onClick={applyFilter}
