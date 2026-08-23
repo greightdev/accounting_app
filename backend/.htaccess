@@ -1,0 +1,13 @@
+# Block direct access to files that should never be served over the web.
+<FilesMatch "^\.env|composer\.(json|lock)$">
+    Require all denied
+</FilesMatch>
+
+RewriteEngine On
+
+# Block browsing/serving anything inside the backend's vendor/ folder.
+RewriteCond %{REQUEST_URI} /vendor/ [NC]
+RewriteRule .* - [F,L]
+
+# Never list directory contents.
+Options -Indexes
