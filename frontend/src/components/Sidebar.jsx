@@ -81,7 +81,7 @@ export default function Sidebar() {
   const visibleNavItems = filterNavItems(navItems, role);
 
   return (
-    <aside className="w-60 h-screen bg-slate-700 text-slate-200 flex flex-col py-5 shrink-0">
+    <aside className="w-60 h-full bg-slate-700 text-slate-200 flex flex-col py-5 shrink-0">
       <div className="flex items-center gap-2.5 px-5 mb-7">
         {/* <span className="w-8 h-8 rounded-lg bg-white text-gray-900 flex items-center justify-center text-sm font-bold">
         // for icon
