@@ -51,7 +51,7 @@ export function adaptTransactionForView(tx) {
 export function adaptInvoiceForView(tx, contactLabel = "Customer") {
     return {
         documentTitle: tx.type === "SALES" ? "Sales Invoice" : "Purchase Bill",
-        refNumber: tx.ref_number,
+        refNumber: tx.display_ref_number || tx.ref_number,
         date: tx.date,
         dueDate: tx.due_date,
         status: tx.status,

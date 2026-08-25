@@ -101,6 +101,7 @@ try {
             le.narration,
             le.date,
             t.ref_number,
+            t.vendor_bill_no,
             t.type AS transaction_type,
             t.status
         FROM ledger_entries le
@@ -139,6 +140,7 @@ try {
                 'account_name' => $account['name'],
                 'date' => $entry['date'],
                 'ref_number' => $entry['ref_number'],
+                'display_ref_number' => $entry['vendor_bill_no'] ?: $entry['ref_number'],
                 'transaction_type' => $entry['transaction_type'],
                 'narration' => $entry['narration'],
                 'debit' => $debit > 0 ? $debit : 0,

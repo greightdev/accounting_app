@@ -18,7 +18,7 @@ export const ACCOUNTING_REPORTS = {
         ],
         columns: [
             { key: "date", header: "Date", render: (r) => formatBsDate(r.date) },
-            { key: "ref_number", header: "Ref #" },
+            { key: "ref_number", header: "Ref #", render: (r) => r.display_ref_number || r.ref_number },
             { key: "transaction_type", header: "Type" },
             { key: "narration", header: "Narration" },
             { key: "debit", header: "Debit", align: "right", render: (r) => r.debit ? Number(r.debit).toLocaleString(undefined, { minimumFractionDigits: 2 }) : "-" },
@@ -45,7 +45,7 @@ export const ACCOUNTING_REPORTS = {
             { key: "account_code", header: "Code" },
             { key: "account_name", header: "Account" },
             { key: "date", header: "Date", render: (r) => formatBsDate(r.date) },
-            { key: "ref_number", header: "Ref #" },
+            { key: "ref_number", header: "Ref #", render: (r) => r.display_ref_number || r.ref_number },
             { key: "narration", header: "Narration" },
             { key: "debit", header: "Debit", align: "right", render: (r) => r.debit ? Number(r.debit).toLocaleString(undefined, { minimumFractionDigits: 2 }) : "-" },
             { key: "credit", header: "Credit", align: "right", render: (r) => r.credit ? Number(r.credit).toLocaleString(undefined, { minimumFractionDigits: 2 }) : "-" },
@@ -115,7 +115,7 @@ export const ACCOUNTING_REPORTS = {
         endpoint: "/reports/accounting_reports/day_book.php",
         columns: [
             { key: "date", header: "Date", render: (r) => formatBsDate(r.date) },
-            { key: "ref_number", header: "Ref #" },
+            { key: "ref_number", header: "Ref #", render: (r) => r.display_ref_number || r.ref_number },
             { key: "transaction_type", header: "Type" },
             { key: "account_name", header: "Account" },
             { key: "contact_name", header: "Contact", render: (r) => r.contact_name ?? "-" },

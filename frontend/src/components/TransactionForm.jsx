@@ -87,7 +87,7 @@ export default function TransactionForm({
     const [contact, setContact] = useState(initialData?.contact_id != null ? String(initialData.contact_id) : "");
     const [salesman, setSalesman] = useState("");
     const [notes, setNotes] = useState(initialData?.notes ?? "");
-    const [refNumber, setRefNumber] = useState(initialData?.ref_number ?? "");
+    const [vendorBillNo, setVendorBillNo] = useState(initialData?.vendor_bill_no ?? "");
     const [expandedRows, setExpandedRows] = useState({});
     const [fieldErrors, setFieldErrors] = useState({});
     const [lineItemsError, setLineItemsError] = useState("");
@@ -226,7 +226,7 @@ export default function TransactionForm({
             date,
             ...(showDueDate ? { due_date: dueDate } : {}),
             ...(showPaymentAccount ? { mode, payment_account: paymentAccount } : {}),
-            ...(billNumberEditable ? { ref_number: refNumber || null } : {}),
+            ...(billNumberEditable ? { vendor_bill_no: vendorBillNo || null } : {}),
             contact_id: contact,
             ...(showSalesman ? { salesman_id: salesman } : {}),
             notes,
@@ -277,8 +277,8 @@ export default function TransactionForm({
                             <input
                                 type="text"
                                 placeholder="e.g. HSP-2026-001"
-                                value={refNumber}
-                                onChange={(e) => setRefNumber(e.target.value)}
+                                value={vendorBillNo}
+                                onChange={(e) => setVendorBillNo(e.target.value)}
                                 className={inputCls}
                             />
                         </div>

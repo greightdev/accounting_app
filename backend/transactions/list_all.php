@@ -27,7 +27,7 @@ $validStatuses = ['DRAFT', 'APPROVED', 'VOID'];
 try {
     $sql = "
         SELECT
-            t.id, t.type, t.date, t.ref_number, t.total_amount, t.status, t.notes,
+            t.id, t.type, t.date, t.ref_number, t.vendor_bill_no, COALESCE(NULLIF(t.vendor_bill_no, ''), t.ref_number) AS display_ref_number, t.total_amount, t.status, t.notes,
             c.name AS contact_name,
             ba.name AS bank_account_name,
             u.name AS created_by_name
@@ -44,7 +44,8 @@ try {
     if ($dateFrom) { $sql .= " AND t.date >= ?"; $params[] = $dateFrom; }
     if ($dateTo) { $sql .= " AND t.date <= ?"; $params[] = $dateTo; }
     if ($search) {
-        $sql .= " AND (t.ref_number LIKE ? OR c.name LIKE ?)";
+        $sql .= " AND (t.ref_number LIKE ? OR t.vendor_bill_no LIKE ? OR c.name LIKE ?)";
+        $params[] = "%$search%";
         $params[] = "%$search%";
         $params[] = "%$search%";
     }

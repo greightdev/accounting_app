@@ -57,7 +57,17 @@ if ($errors) {
 try {
     // Check bill exists
     $existing = $pdo->prepare("
-        SELECT id, status, ref_number, contact_id, date, due_date, sub_total, vat_amount, total_amount, notes
+        SELECT
+            id,
+            status,
+            ref_number,
+            vendor_bill_no,
+            contact_id,
+            date, due_date,
+            sub_total,
+            vat_amount,
+            total_amount,
+            notes
         FROM transactions
         WHERE id = ? AND type = 'PURCHASE'
     ");
@@ -180,9 +190,6 @@ try {
     }
 
     $grandTotal = $subTotal + $vatTotal;
-    $fullNotes  = $vendorBillNo
-        ? "Vendor Bill #: {$vendorBillNo}" . ($notes ? " | {$notes}" : '')
-        : ($notes ?: null);
 
     $pdo->beginTransaction();
 
@@ -193,6 +200,7 @@ try {
             contact_id = ?,
             date = ?,
             due_date = ?,
+            vendor_bill_no = ?,
             sub_total = ?,
             vat_amount = ?,
             total_amount = ?,
@@ -203,10 +211,11 @@ try {
         $contactId,
         $date,
         $dueDate ?: null,
+        $vendorBillNo ?: null,
         $subTotal,
         $vatTotal,
         $grandTotal,
-        $fullNotes,
+        $notes ?: null,
         $id
     ]);
 
@@ -252,8 +261,8 @@ try {
         'UPDATE',
         'transactions',
         $id,
-        ['contact_id' => (int)$bill['contact_id'], 'date' => $bill['date'], 'due_date' => $bill['due_date'], 'sub_total' => (float)$bill['sub_total'], 'vat_amount' => (float)$bill['vat_amount'], 'total_amount' => (float)$bill['total_amount'], 'notes' => $bill['notes']],
-        ['contact_id' => (int)$contactId, 'date' => $date, 'due_date' => $dueDate ?: null, 'sub_total' => $subTotal, 'vat_amount' => $vatTotal, 'total_amount' => $grandTotal, 'notes' => $fullNotes]
+        ['contact_id' => (int)$bill['contact_id'], 'date' => $bill['date'], 'due_date' => $bill['due_date'], 'vendor_bill_no' => $bill['vendor_bill_no'], 'sub_total' => (float)$bill['sub_total'], 'vat_amount' => (float)$bill['vat_amount'], 'total_amount' => (float)$bill['total_amount'], 'notes' => $bill['notes']],
+        ['contact_id' => (int)$contactId, 'date' => $date, 'due_date' => $dueDate ?: null, 'vendor_bill_no' => $vendorBillNo ?: null, 'sub_total' => $subTotal, 'vat_amount' => $vatTotal, 'total_amount' => $grandTotal, 'notes' => $notes ?: null]
     );
 
     http_response_code(200);

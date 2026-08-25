@@ -28,8 +28,7 @@ export const PAYABLES_REPORTS = {
             { key: "total_90_plus", label: "90+ Days" },
         ],
         columns: [
-            { key: "ref_number", header: "Bill #" },
-            { key: "bill_date", header: "Date", render: (r) => formatBsDate(r.bill_date) },
+            { key: "ref_number", header: "Bill #", render: (r) => r.display_ref_number || r.ref_number },
             { key: "vendor_name", header: "Vendor" },
             { key: "billed_amount", header: "Billed", align: "right", render: (r) => Number(r.billed_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }) },
             { key: "outstanding", header: "Outstanding", align: "right", render: (r) => Number(r.outstanding || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }) },
@@ -50,8 +49,7 @@ export const PAYABLES_REPORTS = {
         ],
         columns: [
             { key: "date", header: "Date", render: (r) => formatBsDate(r.date) },
-            { key: "ref_number", header: "Ref #" },
-            { key: "type", header: "Type" },
+            { key: "ref_number", header: "Ref #", render: (r) => r.display_ref_number || r.ref_number },
             { key: "sub_total", header: "Taxable", align: "right", render: (r) => r.sub_total ? Number(r.sub_total).toLocaleString(undefined, { minimumFractionDigits: 2 }) : "-" },
             { key: "vat_amount", header: "VAT", align: "right", render: (r) => r.vat_amount ? Number(r.vat_amount).toLocaleString(undefined, { minimumFractionDigits: 2 }) : "-" },
             { key: "tds_amount", header: "TDS", align: "right", render: (r) => r.tds_amount ? Number(r.tds_amount).toLocaleString(undefined, { minimumFractionDigits: 2 }) : "-" },

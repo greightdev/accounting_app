@@ -164,16 +164,13 @@ try {
     $pdo->beginTransaction();
 
     // Insert transaction
-    $fullNotes = $vendorBillNo
-        ? "Vendor Bill #: {$vendorBillNo}" . ($notes ? " | {$notes}" : '')
-        : ($notes ?: null);
-
     $txStmt = $pdo->prepare("
         INSERT INTO transactions (
             type,
             date,
             due_date,
             ref_number,
+            vendor_bill_no,
             contact_id,
             sub_total,
             vat_amount,
@@ -182,17 +179,18 @@ try {
             status,
             created_by
         )
-        VALUES ('PURCHASE', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES ('PURCHASE', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     $txStmt->execute([
         $date,
         $dueDate ?: null,
         $refNumber,
+        $vendorBillNo ?: null,
         $contactId,
         $subTotal,
         $vatTotal,
         $grandTotal,
-        $fullNotes,
+        $notes ?: null,
         $status,
         $_SESSION['user_id']
     ]);
@@ -268,7 +266,7 @@ try {
             VALUES (?, ?, ?, ?, ?, ?)
         ");
 
-        $narration = "Purchase Bill {$refNumber} - {$contact['name']}";
+        $narration = "Purchase Bill " . ($vendorBillNo ?: $refNumber) . " - {$contact['name']}";
 
         // Purchase Dr (taxable amount - our cost)
         $ledgerStmt->execute([$txId, $purchaseId, $subTotal, 0, $date, $narration]);
@@ -289,7 +287,7 @@ try {
         'transactions',
         $txId,
         null,
-        ['type' => 'PURCHASE', 'ref_number' => $refNumber, 'contact_id' => (int)$contactId, 'sub_total' => $subTotal, 'vat_amount' => $vatTotal, 'total_amount' => $grandTotal, 'status' => $status]
+        ['type' => 'PURCHASE', 'ref_number' => $refNumber, 'vendor_bill_no' => $vendorBillNo ?: null, 'contact_id' => (int)$contactId, 'sub_total' => $subTotal, 'vat_amount' => $vatTotal, 'total_amount' => $grandTotal, 'status' => $status]
     );
 
     http_response_code(201);
@@ -299,6 +297,7 @@ try {
         "data" => [
             "id" => $txId,
             "ref_number" => $refNumber,
+            "vendor_bill_no" => $vendorBillNo ?: null,
             "status" => $status,
         ]
     ]);

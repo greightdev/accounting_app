@@ -12,6 +12,8 @@ function generateRegisterReport(
         SELECT
             t.id,
             t.ref_number,
+            t.vendor_bill_no,
+            COALESCE(NULLIF(t.vendor_bill_no, ''), t.ref_number) AS display_ref_number,
             t.date,
             t.sub_total,
             t.vat_amount,

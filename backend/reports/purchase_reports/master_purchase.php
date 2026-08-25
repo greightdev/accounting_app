@@ -25,6 +25,7 @@ try {
             ti.id,
             t.date,
             t.ref_number,
+            COALESCE(NULLIF(t.vendor_bill_no, ''), t.ref_number) AS display_ref_number,
             i.name AS item_name,
             ti.rate,
             ti.quantity,

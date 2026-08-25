@@ -35,6 +35,7 @@ try {
             t.date,
             t.due_date,
             t.ref_number,
+            t.vendor_bill_no,
             t.contact_id,
             c.name AS vendor_name,
             t.sub_total,

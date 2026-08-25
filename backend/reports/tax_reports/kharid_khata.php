@@ -32,7 +32,7 @@ try {
     $stmt = $pdo->prepare("
         SELECT
             t.id,
-            t.ref_number AS bill_number,
+            COALESCE(NULLIF(t.vendor_bill_no, ''), t.ref_number) AS bill_number,
             t.date AS bill_date,
             c.name AS vendor_name,
             c.pan AS vendor_pan,
@@ -55,7 +55,7 @@ try {
             GROUP BY ta.settled_transaction_id
         ) tds ON tds.bill_id = t.id
         WHERE t.type = 'PURCHASE' AND t.status = 'APPROVED' AND t.date BETWEEN ? AND ?
-        GROUP BY t.id, t.ref_number, t.date, c.name, c.pan, t.sub_total, t.vat_amount, t.total_amount, tds.tds_total
+        GROUP BY t.id, t.ref_number, t.vendor_bill_no, t.date, c.name, c.pan, t.sub_total, t.vat_amount, t.total_amount, tds.tds_total
         ORDER BY t.date ASC, t.id ASC
     ");
     $stmt->execute([$dateFrom, $dateTo]);

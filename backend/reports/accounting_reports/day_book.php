@@ -30,6 +30,7 @@ try {
             le.narration,
             t.id AS transaction_id,
             t.ref_number,
+            t.vendor_bill_no,
             t.type AS transaction_type,
             t.status,
             a.name AS account_name,
@@ -69,6 +70,7 @@ try {
         $rows[] = [
             'date' => $entry['date'],
             'ref_number' => $entry['ref_number'],
+            'display_ref_number' => $entry['vendor_bill_no'] ?: $entry['ref_number'],
             'transaction_type' => $entry['transaction_type'],
             'account_name' => $entry['account_name'],
             'account_code' => $entry['account_code'],

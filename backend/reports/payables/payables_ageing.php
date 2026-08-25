@@ -21,6 +21,7 @@ try {
         SELECT
             t.id,
             t.ref_number,
+            t.vendor_bill_no,
             t.date AS bill_date,
             t.due_date,
             t.total_amount AS billed_amount,
@@ -63,6 +64,7 @@ try {
         $rows[] = [
             'id' => $bill['id'],
             'ref_number' => $bill['ref_number'],
+            'display_ref_number' => $bill['vendor_bill_no'] ?: $bill['ref_number'],
             'bill_date' => $bill['bill_date'],
             'due_date' => $bill['due_date'],
             'vendor_name' => $bill['vendor_name'],

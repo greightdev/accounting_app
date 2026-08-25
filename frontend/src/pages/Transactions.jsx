@@ -61,13 +61,14 @@ export default function Transactions() {
         const term = search.toLowerCase();
         const matchesSearch = 
             tx.ref_number.toLowerCase().includes(term) ||
+            (tx.vendor_bill_no ?? "").toLowerCase().includes(term) ||
             (tx.contact_name ?? "").toLowerCase().includes(term);
         return matchesSearch;
     })
 
     const columns = [
         { key: "date", header: "Date" },
-        { key: "ref_number", header: "Ref #" },
+        { key: "ref_number", header: "Ref #", render: (tx) => tx.display_ref_number || tx.ref_number },
         { key: "type", header: "Type", render: (tx) => TYPE_LABELS[tx.type] ?? tx.type },
         { key: "contact_name", header: "Contact", render: (tx) => tx.contact_name ?? tx.bank_account_name ?? "" },
         { key: "total_amount", header: "Amount", align: "right",

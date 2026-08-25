@@ -14,8 +14,7 @@ export const PURCHASE_REPORTS = {
         ],
         columns: [
             { key: "date", header: "Date", render: (r) => formatBsDate(r.date) },
-            { key: "ref_number", header: "Ref #" },
-            { key: "contact_name", header: "Vendor" },
+            { key: "ref_number", header: "Ref #", render: (r) => r.display_ref_number || r.ref_number },
             { key: "contact_pan", header: "PAN", render: (r) => r.contact_pan ?? "-" },
             { key: "sub_total", header: "Taxable", align: "right", render: (r) => Number(r.sub_total || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }) },
             { key: "vat_amount", header: "VAT", align: "right", render: (r) => Number(r.vat_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }) },
@@ -61,7 +60,7 @@ export const PURCHASE_REPORTS = {
         ],
         columns: [
             { key: "date", header: "Date", render: (r) => formatBsDate(r.date) },
-            { key: "ref_number", header: "Bill #" },
+            { key: "ref_number", header: "Bill #", render: (r) => r.display_ref_number || r.ref_number },
             { key: "item_name", header: "Name" },
             { key: "rate", header: "Rate", align: "right", render: (r) => Number(r.rate || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }) },
             { key: "quantity", header: "Quantity", align: "right" },

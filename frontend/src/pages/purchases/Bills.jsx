@@ -73,6 +73,7 @@ export default function Bills() {
         const term = search.toLowerCase();
         const matchesSearch = 
             bill.ref_number.toLowerCase().includes(term) ||
+            (bill.vendor_bill_no || "").toLowerCase().includes(term) ||
             bill.vendor_name.toLowerCase().includes(term);
         return matchesSearch
     });
@@ -148,7 +149,7 @@ export default function Bills() {
 
     const baseColumns = [
         { key: "date", header: "Date", },
-        { key: "ref_number", header: "#", },
+        { key: "ref_number", header: "#", render: (bill) => bill.display_ref_number || bill.ref_number },
         { key: "vendor_name", header: "Vendor", },
         { key: "total_amount", header: "Net Amount",
             render: (bill) => bill.total_amount.toLocaleString(undefined, {

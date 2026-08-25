@@ -28,6 +28,8 @@ function tableLabel(name) {
 
 function describeEntry(log) {
     const ref =
+        log.new_value?.vendor_bill_no ??
+        log.old_value?.vendor_bill_no ??
         log.new_value?.ref_number ??
         log.old_value?.ref_number ??
         log.new_value?.name ??

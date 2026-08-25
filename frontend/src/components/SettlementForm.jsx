@@ -171,7 +171,7 @@ export default function SettlementForm({
         if (!amountErr && exceedsOutstanding) {
             errors.amount =
                 `Total clearing (Rs. ${totalCleared.toLocaleString()}) exceeds the outstanding balance ` +
-                `(Rs. ${docOutstanding.toLocaleString()}) on ${selectedDoc.ref_number}.`;
+                `(Rs. ${docOutstanding.toLocaleString()}) on ${selectedDoc.display_ref_number || selectedDoc.ref_number}.`;
         }
 
         setFieldErrors(errors);
@@ -297,7 +297,7 @@ export default function SettlementForm({
                             </option>
                             {openDocuments.map((doc) => (
                                 <option key={doc.id} value={doc.id}>
-                                    {doc.ref_number} — Rs. {parseFloat(doc.balance_due ?? doc.total_amount).toLocaleString()}
+                                    {doc.display_ref_number || doc.ref_number} — Rs. {parseFloat(doc.balance_due ?? doc.total_amount).toLocaleString()}
                                 </option>
                             ))}
                         </select>

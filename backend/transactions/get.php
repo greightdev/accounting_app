@@ -29,7 +29,7 @@ if ($id <= 0) {
 try {
     $stmt = $pdo->prepare("
         SELECT
-            t.id, t.type, t.date, t.due_date, t.ref_number,
+            t.id, t.type, t.date, t.due_date, t.ref_number, t.vendor_bill_no, COALESCE(NULLIF(t.vendor_bill_no, ''), t.ref_number) AS display_ref_number,
             t.contact_id, t.bank_account_id, t.payment_mode, t.payment_ref, t.contra_account_id,
             t.sub_total, t.vat_amount, t.tds_amount, t.total_amount,
             t.notes, t.status, t.voided_at, t.void_reason,
