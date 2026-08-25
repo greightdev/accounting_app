@@ -21,6 +21,10 @@ $action = $_GET['action'] ?? null;
 $tableName = $_GET['table_name'] ?? null;
 $userId = $_GET['user_id'] ?? null;
 $search = trim($_GET['search'] ?? '');
+$limit = isset($_GET['limit']) ? (int)$_GET['limit'] : null;
+if ($limit !== null && ($limit <= 0 || $limit > 500)) {
+    $limit = null;
+}
  
 $validActions = ['CREATE', 'UPDATE', 'DELETE', 'VOID'];
 
@@ -57,7 +61,8 @@ try {
     }
  
     $whereSql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
- 
+    $limitSql = $limit !== null ? "LIMIT $limit" : '';
+
     $stmt = $pdo->prepare("
         SELECT
             al.id,
@@ -74,6 +79,7 @@ try {
         LEFT JOIN users u ON u.id = al.user_id
         $whereSql
         ORDER BY al.created_at DESC, al.id DESC
+        $limitSql
     ");
     $stmt->execute($params);
     $rows = $stmt->fetchAll();
