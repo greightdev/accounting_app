@@ -77,6 +77,7 @@ const REPORT_GROUPS = [
         reports: [
             { key: "sales-account-np", label: "बिक्री खाता (Sales Account)", icon: Globe, path: "/reports/sales-account-np" },
             { key: "purchase-account-np", label: "खरिद खाता (Purchase Account)", icon: Globe, path: "/reports/purchase-account-np" },
+            { key: "expense-book", label: "Expense Book", icon: Globe, path: "/reports/expense-book" },
             { key: "vat-return", label: "VAT Return", icon: Scale, path: "/reports/vat-return" },
             { key: "tds-report-np", label: "TDS Report", icon: FileWarning, path: "/reports/tds-report-np" },
             { key: "tds-summary-np", label: "TDS Summary", icon: FileWarning, path: "/reports/tds-summary-np" },
