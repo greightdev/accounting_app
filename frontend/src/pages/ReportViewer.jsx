@@ -74,8 +74,29 @@ export default function ReportViewer() {
             });
 
             const { data } = await api.get(`${report.endpoint}?${params.toString()}`);
-            setData(data.data ?? []);
-            setMeta(data.meta ?? null);
+            let rows = data.data ?? [];
+            const metaResp = data.meta ?? null;
+
+            if (report.appendMetaRow && metaResp) {
+                const cfg = report.appendMetaRow;
+                const value = metaResp[cfg.metaKey];
+                if (value !== undefined && value !== null) {
+                    const blankRow = report.columns.reduce((acc, c) => ({ ...acc, [c.key]: "" }), {});
+                    rows = [
+                        ...rows,
+                        {
+                            ...blankRow,
+                            [cfg.labelColumn ?? report.columns[0]?.key]: cfg.label,
+                            [cfg.valueColumn ?? "amount"]: value,
+                            is_subtotal: true,
+                            [cfg.flagKey ?? "is_appended_meta_row"]: true,
+                        },
+                    ];
+                }
+            }
+
+            setData(rows);
+            setMeta(metaResp);
         } catch (err) {
             console.error(`Failed to fetch ${reportKey}:`, err);
         } finally {

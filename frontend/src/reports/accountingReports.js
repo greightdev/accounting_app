@@ -79,10 +79,22 @@ export const ACCOUNTING_REPORTS = {
             { key: "section", header: "Section" },
             { key: "amount", header: "Amount", align: "right", render: (r) => r.amount === "" || r.amount == null ? "-" : Number(r.amount).toLocaleString(undefined, { minimumFractionDigits: 2 }) },
         ],
-        summaryFields: [
-            { key: "net_profit", label: "Net Profit / (Loss)" },
-        ],
-        rowClassName: (row) => (row.is_subtotal ? "font-semibold bg-slate-100" : ""),
+        appendMetaRow: {
+            metaKey: "net_profit",
+            valueColumn: "amount",
+            labelColumn: "account_name",
+            label: "Net Profit / Loss",
+            flagKey: "is_net_profit",
+        },
+        rowClassName: (row) => {
+            if (row.is_net_profit) {
+                const isProfit = Number(row.amount) >= 0;
+                return `font-semibold border-t-2 border-slate-300 ${
+                    isProfit ? "text-emerald-700" : "text-red-600"
+                }`;
+            }
+            return row.is_subtotal ? "font-semibold bg-slate-100" : "";
+        },
     },
     "balance-sheet": {
         title: "Balance Sheet",
