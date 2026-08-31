@@ -82,6 +82,10 @@ export default function ReportViewer() {
                 const value = metaResp[cfg.metaKey];
                 if (value !== undefined && value !== null) {
                     const blankRow = report.columns.reduce((acc, c) => ({ ...acc, [c.key]: "" }), {});
+                    const extraFields = {};
+                    (cfg.extraMetaFields ?? []).forEach((metaField) => {
+                        if (metaResp[metaField] !== undefined) extraFields[metaField] = metaResp[metaField];
+                    });
                     rows = [
                         ...rows,
                         {
@@ -90,6 +94,7 @@ export default function ReportViewer() {
                             [cfg.valueColumn ?? "amount"]: value,
                             is_subtotal: true,
                             [cfg.flagKey ?? "is_appended_meta_row"]: true,
+                            ...extraFields,
                         },
                     ];
                 }

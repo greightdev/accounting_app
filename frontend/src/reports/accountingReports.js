@@ -77,21 +77,24 @@ export const ACCOUNTING_REPORTS = {
             { key: "account_code", header: "Code" },
             { key: "account_name", header: "Account" },
             { key: "section", header: "Section" },
-            { key: "amount", header: "Amount", align: "right", render: (r) => r.amount === "" || r.amount == null ? "-" : Number(r.amount).toLocaleString(undefined, { minimumFractionDigits: 2 }) },
+            {
+                key: "amount",
+                header: "Amount",
+                align: "right",
+                render: (r) => r.amount === "" || r.amount == null ? "-" : Number(r.amount).toLocaleString(undefined, { minimumFractionDigits: 2 }),
+                cellClassName: (r) => r.is_net_profit ? (Number(r.amount) >= 0 ? "text-emerald-700" : "text-red-600") : "",
+            },
         ],
         appendMetaRow: {
             metaKey: "net_profit",
             valueColumn: "amount",
             labelColumn: "account_name",
-            label: "Net Profit / Loss",
+            label: "Net Profit / (Loss)",
             flagKey: "is_net_profit",
         },
         rowClassName: (row) => {
             if (row.is_net_profit) {
-                const isProfit = Number(row.amount) >= 0;
-                return `font-semibold border-t-2 border-slate-300 ${
-                    isProfit ? "text-emerald-700" : "text-red-600"
-                }`;
+                return "font-bold bg-slate-100 border-t-2 border-slate-300 text-slate-900";
             }
             return row.is_subtotal ? "font-semibold bg-slate-100" : "";
         },
@@ -104,9 +107,31 @@ export const ACCOUNTING_REPORTS = {
             { key: "account_code", header: "Code" },
             { key: "account_name", header: "Account" },
             { key: "section", header: "Section" },
-            { key: "amount", header: "Amount", align: "right", render: (r) => r.amount === "" || r.amount == null ? "-" : Number(r.amount).toLocaleString(undefined, { minimumFractionDigits: 2 }) },
+            {
+                key: "amount",
+                header: "Amount",
+                align: "right",
+                render: (r) => r.amount === "" || r.amount == null ? "-" : Number(r.amount).toLocaleString(undefined, { minimumFractionDigits: 2 }),
+                cellClassName: (r) => r.is_balance_check ? (r.is_balanced ? "text-emerald-700" : "text-red-600") : "",
+            },
         ],
-        rowClassName: (row) => (row.is_subtotal ? "font-semibold bg-slate-100" : ""),
+        appendMetaRow: {
+            metaKey: "total_liabilities_and_equity",
+            valueColumn: "amount",
+            labelColumn: "account_name",
+            label: "Total Liabilities and Equity",
+            flagKey: "is_balance_check",
+            extraMetaFields: ["is_balanced"],
+        },
+        rowClassName: (row) => {
+            if (row.is_balance_check) {
+                return "font-bold bg-slate-50 border-t border-slate-300 text-slate-900";
+            }
+            if (row.is_group_subtotal) {
+                return "font-semibold bg-slate-50 text-slate-800";
+            }
+            return row.is_subtotal ? "font-bold bg-slate-100 border-t border-slate-300 text-slate-900" : "";
+        },
     },
     "cash-flow": {
         title: "Cash Flow Statement",

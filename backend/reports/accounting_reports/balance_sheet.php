@@ -24,6 +24,7 @@ try {
             a.id,
             a.name AS account_name,
             a.code AS account_code,
+            a.account_group_id,
             ag.type AS group_type,
             ag.name AS group_name,
             COALESCE(SUM(le.debit), 0) AS total_debit,
@@ -37,7 +38,7 @@ try {
             WHERE t.status = 'APPROVED' AND le.date <= ?
         ) le ON le.account_id = a.id
         WHERE a.is_active = TRUE AND ag.type IN ('Asset', 'Liability', 'Equity')
-        GROUP BY a.id, a.name, a.code, ag.type, ag.name
+        GROUP BY a.id, a.name, a.code, a.account_group_id, ag.type, ag.name
         ORDER BY ag.type, a.code
     ");
     $stmt->execute([$asOf]);
@@ -70,12 +71,46 @@ try {
     }
     $retainedEarnings = $totalIncome - $totalExpense;
 
+    $groupsById = [];
+    foreach ($pdo->query("SELECT id, name, parent_id FROM account_groups")->fetchAll() as $g) {
+        $groupsById[(int)$g['id']] = ['name' => $g['name'], 'parent_id' => $g['parent_id'] !== null ? (int)$g['parent_id'] : null];
+    }
+    $topLevelGroupName = function (int $groupId) use ($groupsById): string {
+        $current = $groupsById[$groupId] ?? null;
+        if (!$current) return '';
+        while ($current['parent_id'] !== null && isset($groupsById[$current['parent_id']]) && $groupsById[$current['parent_id']]['parent_id'] !== null) {
+            $current = $groupsById[$current['parent_id']];
+        }
+        return $current['name'];
+    };
+
     $assetRows = [];
     $liabilityRows = [];
     $equityRows = [];
     $totalAssets = 0;
     $totalLiabilities = 0;
     $totalEquity = 0;
+
+    // Running subtotal per top-level bucket, for Asset/Liability sections only.
+    $bucketTrackers = [
+        'Asset' => ['name' => null, 'subtotal' => 0.0],
+        'Liability' => ['name' => null, 'subtotal' => 0.0],
+    ];
+    $flushBucket = function (string $type) use (&$bucketTrackers, &$assetRows, &$liabilityRows) {
+        $name = $bucketTrackers[$type]['name'];
+        if ($name === null) return;
+        $subtotalRow = [
+            'account_code' => '',
+            'account_name' => "Total {$name}",
+            'group_name' => $name,
+            'section' => $type,
+            'amount' => $bucketTrackers[$type]['subtotal'],
+            'is_subtotal' => true,
+            'is_group_subtotal' => true,
+        ];
+        if ($type === 'Asset') { $assetRows[] = $subtotalRow; }
+        if ($type === 'Liability') { $liabilityRows[] = $subtotalRow; }
+    };
 
     foreach ($rows as $row) {
         $debit = (float)$row['total_debit'];
@@ -90,6 +125,18 @@ try {
             'amount' => $amount,
             'is_subtotal' => false,
         ];
+
+        if (isset($bucketTrackers[$row['group_type']])) {
+            $bucketName = $topLevelGroupName((int)$row['account_group_id']);
+            $currentBucket = $bucketTrackers[$row['group_type']]['name'];
+            if ($currentBucket !== null && $currentBucket !== $bucketName) {
+                $flushBucket($row['group_type']);
+                $bucketTrackers[$row['group_type']] = ['name' => $bucketName, 'subtotal' => 0.0];
+            } elseif ($currentBucket === null) {
+                $bucketTrackers[$row['group_type']]['name'] = $bucketName;
+            }
+            $bucketTrackers[$row['group_type']]['subtotal'] += $amount;
+        }
 
         switch ($row['group_type']) {
             case 'Asset':
@@ -106,6 +153,8 @@ try {
                 break;
         }
     }
+    $flushBucket('Asset');
+    $flushBucket('Liability');
 
     $totalEquity += $retainedEarnings;
     $equityRows[] = [
