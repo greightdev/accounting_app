@@ -93,6 +93,21 @@ try {
         exit();
     }
 
+    // Post each line item's taxable amount to its own income account when the item has one set, falling back to the system "Sales" account otherwise.
+    $breakdownStmt = $pdo->prepare("
+        SELECT COALESCE(i.account_id, ?) AS resolved_account_id, SUM(ti.taxable_amount) AS amount
+        FROM transaction_items ti
+        LEFT JOIN items i ON i.id = ti.item_id
+        WHERE ti.transaction_id = ?
+        GROUP BY resolved_account_id
+    ");
+    $breakdownStmt->execute([$salesId, $id]);
+    $accountBreakdown = $breakdownStmt->fetchAll();
+
+    if (!$accountBreakdown) {
+        $accountBreakdown = [['resolved_account_id' => $salesId, 'amount' => $invoice['sub_total']]];
+    }
+
     $ledgerStmt = $pdo->prepare("
         INSERT INTO ledger_entries (
             transaction_id,
@@ -107,7 +122,10 @@ try {
     $narration = "Sales Invoice {$invoice['ref_number']} - {$invoice['customer_name']}";
 
     $ledgerStmt->execute([$id, $receivableId, $invoice['total_amount'], 0, $invoice['date'], $narration]);
-    $ledgerStmt->execute([$id, $salesId, 0, $invoice['sub_total'], $invoice['date'], $narration]);
+    foreach ($accountBreakdown as $row) {
+        if ((float)$row['amount'] <= 0) continue;
+        $ledgerStmt->execute([$id, (int)$row['resolved_account_id'], 0, $row['amount'], $invoice['date'], $narration]);
+    }
     if ($invoice['vat_amount'] > 0) {
         $ledgerStmt->execute([$id, $vatPayableId, 0, $invoice['vat_amount'], $invoice['date'], $narration]);
     }

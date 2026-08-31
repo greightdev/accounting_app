@@ -25,6 +25,7 @@ const emptyForm = {
     purchase_rate: '',
     tax_type: 'VAT13',
     vendor_id: '',
+    account_id: '',
 }
 
 export default function Items() {
@@ -32,6 +33,7 @@ export default function Items() {
     const canDelete = can(role, "canDelete");
     const [items, setItems] = useState([]);
     const [vendors, setVendors] = useState([]);
+    const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [tab, setTab] = useState("All");
@@ -51,9 +53,23 @@ export default function Items() {
 
     useEffect(() => {
         fetchVendors();
+        fetchAccounts();
     }, []);
 
+    const fetchAccounts = async () => {
+        try {
+            const { data } = await api.get('/accounts/list.php');
+            setAccounts(data.data ?? []);
+        } catch (err) {
+            console.error('Failed to fetch accounts: ', err);
+        }
+    };
+
     const filterToType = { All: '', Selling: 'SELLING', Purchase: 'PURCHASE' };
+
+    const accountOptionsForType = accounts.filter((a) =>
+        modalType === 'selling' ? a.account_group_type === 'Income' : ['Expense', 'Asset'].includes(a.account_group_type)
+    );
 
     const fetchItems = async () => {
         setLoading(true);
@@ -99,6 +115,7 @@ export default function Items() {
             purchase_rate: item.purchase_rate,
             tax_type: item.tax_type,
             vendor_id: item.vendor_id ? String(item.vendor_id) : '',
+            account_id: item.account_id ? String(item.account_id) : '',
         });
         setModalError('');
         setFieldErrors({});
@@ -145,6 +162,7 @@ export default function Items() {
             name: validateItemName(form.name),
             unit: validateUnit(form.unit),
             hsn_sac_code: validateHsnSac(form.hsn_sac_code),
+            account_id: validateRequiredSelect(form.account_id, { label: "Account" }),
         };
         if (modalType === 'selling') {
             errors.selling_price = validatePrice(form.selling_price, { label: "Selling price" });
@@ -190,6 +208,7 @@ export default function Items() {
                     name: form.name,
                     type: itemType,
                     vendor_id: vendorId,
+                    account_id: form.account_id,
                     unit: form.unit,
                     hsn_sac_code: form.hsn_sac_code,
                     selling_price: sellingPrice,
@@ -202,6 +221,7 @@ export default function Items() {
                     name: form.name,
                     type: itemType,
                     vendor_id: vendorId,
+                    account_id: form.account_id,
                     unit: form.unit,
                     hsn_sac_code: form.hsn_sac_code,
                     selling_price: sellingPrice,
@@ -256,6 +276,11 @@ export default function Items() {
         },
         { key: "vendor_name", header: "Vendor",
             render: (item) => item.vendor_name ?? <span className="text-gray-300">—</span>,
+        },
+        { key: "account_name", header: "Account",
+            render: (item) => item.account_name
+                ? <span className="text-xs text-gray-600">{item.account_code} — {item.account_name}</span>
+                : <span className="text-gray-300">—</span>,
         },
         { key: "unit", header: "Unit", },
         { key: "hsn_sac_code", header: "HSN/SAC", },
@@ -356,6 +381,24 @@ export default function Items() {
                             {fieldErrors.vendor_id && <p className="mt-1 text-xs text-red-500">{fieldErrors.vendor_id}</p>}
                         </div>
                     )}
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                            Account <span className="text-gray-400 font-normal">({modalType === 'selling' ? 'which income this posts to' : 'which expense/asset this posts to'})</span>
+                        </label>
+                        <select
+                            name="account_id"
+                            value={form.account_id}
+                            onChange={handleChange}
+                            className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.account_id ? 'border-red-400' : 'border-gray-200'} bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition`}
+                        >
+                            <option value="">Select account</option>
+                            {accountOptionsForType.map((a) => (
+                                <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
+                            ))}
+                        </select>
+                        {fieldErrors.account_id && <p className="mt-1 text-xs text-red-500">{fieldErrors.account_id}</p>}
+                    </div>
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>

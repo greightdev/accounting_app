@@ -39,6 +39,9 @@ $type = $data['type'] ?? 'SELLING';
 $vendorId = isset($data['vendor_id']) && $data['vendor_id'] !== '' && $data['vendor_id'] !== null
     ? (int) $data['vendor_id']
     : null;
+$accountId = isset($data['account_id']) && $data['account_id'] !== '' && $data['account_id'] !== null
+    ? (int) $data['account_id']
+    : null;
 
 $validTaxTypes = ['VAT13', 'Exempt'];
 $validTypes = ['SELLING', 'PURCHASE'];
@@ -86,6 +89,9 @@ if ($type === 'PURCHASE') {
         $errors[] = "A vendor is required for a purchase item.";
     }
 }
+if (!$accountId) {
+    $errors[] = "An account is required.";
+}
 
 if ($errors) {
     http_response_code(400);
@@ -117,6 +123,40 @@ try {
         $vendorId = null;
     }
 
+    // Account must exist and be active
+    $accountStmt = $pdo->prepare("
+        SELECT a.id, ag.type AS group_type
+        FROM accounts a
+        JOIN account_groups ag ON ag.id = a.account_group_id
+        WHERE a.id = ? AND a.is_active = TRUE
+    ");
+    $accountStmt->execute([$accountId]);
+    $account = $accountStmt->fetch();
+    if (!$account) {
+        http_response_code(422);
+        echo json_encode([
+            "success" => false,
+            "message" => "Selected account not found."
+        ]);
+        exit();
+    }
+    if ($type === 'SELLING' && $account['group_type'] !== 'Income') {
+        http_response_code(422);
+        echo json_encode([
+            "success" => false,
+            "message" => "A selling item must be linked to an Income account."
+        ]);
+        exit();
+    }
+    if ($type === 'PURCHASE' && !in_array($account['group_type'], ['Expense', 'Asset'], true)) {
+        http_response_code(422);
+        echo json_encode([
+            "success" => false,
+            "message" => "A purchase item must be linked to an Expense or Asset account."
+        ]);
+        exit();
+    }
+
     // Duplicate name check, scoped to type
     $dupCheck = $pdo->prepare("
         SELECT id
@@ -140,13 +180,14 @@ try {
             name,
             type,
             vendor_id,
+            account_id,
             unit,
             hsn_sac_code,
             selling_price,
             purchase_rate,
             tax_type
         ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?, ?, ?, ?
         )
     ");
 
@@ -154,6 +195,7 @@ try {
         $name,
         $type,
         $vendorId,
+        $accountId,
         $unit,
         $hsnSacCode,
         (float)$sellingPrice,
@@ -169,7 +211,7 @@ try {
         'items',
         $newId,
         null,
-        ['name' => $name, 'type' => $type, 'vendor_id' => $vendorId, 'unit' => $unit, 'hsn_sac_code' => $hsnSacCode, 'selling_price' => (float)$sellingPrice, 'purchase_rate' => (float)$purchaseRate, 'tax_type' => $taxType]
+        ['name' => $name, 'type' => $type, 'vendor_id' => $vendorId, 'account_id' => $accountId, 'unit' => $unit, 'hsn_sac_code' => $hsnSacCode, 'selling_price' => (float)$sellingPrice, 'purchase_rate' => (float)$purchaseRate, 'tax_type' => $taxType]
     );
 
     http_response_code(201);

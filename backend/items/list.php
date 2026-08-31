@@ -32,6 +32,9 @@ try {
             i.type,
             i.vendor_id,
             v.name AS vendor_name,
+            i.account_id,
+            a.name AS account_name,
+            a.code AS account_code,
             i.unit,
             i.hsn_sac_code,
             i.selling_price,
@@ -41,6 +44,7 @@ try {
             i.updated_at
         FROM items i
         LEFT JOIN contacts v ON v.id = i.vendor_id
+        LEFT JOIN accounts a ON a.id = i.account_id
         WHERE i.is_active = TRUE
     ";
     $params = [];

@@ -93,6 +93,22 @@ try {
         exit();
     }
 
+    // Post each line item's taxable amount to its own account when the item has one set, falling back to the system "Purchase" account otherwise.
+    $breakdownStmt = $pdo->prepare("
+        SELECT COALESCE(i.account_id, ?) AS resolved_account_id, SUM(ti.taxable_amount) AS amount
+        FROM transaction_items ti
+        LEFT JOIN items i ON i.id = ti.item_id
+        WHERE ti.transaction_id = ?
+        GROUP BY resolved_account_id
+    ");
+    $breakdownStmt->execute([$purchaseId, $id]);
+    $accountBreakdown = $breakdownStmt->fetchAll();
+
+    // Fallback for bills with no transaction_items rows (shouldn't normally happen)
+    if (!$accountBreakdown) {
+        $accountBreakdown = [['resolved_account_id' => $purchaseId, 'amount' => $bill['sub_total']]];
+    }
+
     $ledgerStmt = $pdo->prepare("
         INSERT INTO ledger_entries (
             transaction_id,
@@ -106,7 +122,10 @@ try {
     ");
     $narration = "Purchase Bill {$bill['ref_number']} - {$bill['vendor_name']}";
 
-    $ledgerStmt->execute([$id, $purchaseId, $bill['sub_total'], 0, $bill['date'], $narration]);
+    foreach ($accountBreakdown as $row) {
+        if ((float)$row['amount'] <= 0) continue;
+        $ledgerStmt->execute([$id, (int)$row['resolved_account_id'], $row['amount'], 0, $bill['date'], $narration]);
+    }
     if ($bill['vat_amount'] > 0) {
         $ledgerStmt->execute([$id, $vatReceivableId, $bill['vat_amount'], 0, $bill['date'], $narration]);
     }
