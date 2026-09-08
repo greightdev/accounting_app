@@ -106,7 +106,8 @@ export default function TransactionView({
                     </div>
 
                     {lineItems && (
-                        <table className="w-full text-sm mb-6 border-collapse">
+                        <div className="overflow-x-auto mb-6">
+                        <table className="w-full text-sm border-collapse">
                             <thead>
                                 <tr className="border-b-2 border-gray-800">
                                     <th className="text-left py-2">#</th>
@@ -128,10 +129,12 @@ export default function TransactionView({
                                 ))}
                             </tbody>
                         </table>
+                        </div>
                     )}
 
                     {ledgerRows && (
-                        <table className="w-full text-sm mb-6 border-collapse">
+                        <div className="overflow-x-auto mb-6">
+                        <table className="w-full text-sm border-collapse">
                             <thead>
                                 <tr className="border-b-2 border-gray-800">
                                     <th className="text-left py-2">Account</th>
@@ -151,6 +154,7 @@ export default function TransactionView({
                                 ))}
                             </tbody>
                         </table>
+                        </div>
                     )}
 
                     {summaryRows.length > 0 && (

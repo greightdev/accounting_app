@@ -34,7 +34,8 @@ export default function DataTable({
 
     return (
         <div>
-            <table className="w-full overflow-hidden rounded-xl bg-white shadow-sm">
+            <div className="overflow-x-auto">
+                <table className="w-full overflow-hidden rounded-xl bg-white shadow-sm">
                 <thead>
                     <tr className="bg-slate-700 text-white">
                         {columns.map((column) => (
@@ -105,7 +106,8 @@ export default function DataTable({
                         </tr>
                     )}
                 </tbody>
-            </table>
+                </table>
+            </div>
 
             {showPager && (
                 <div className="flex items-center justify-between px-4 py-3 bg-white rounded-b-xl border-t border-slate-100 text-sm text-slate-500">
