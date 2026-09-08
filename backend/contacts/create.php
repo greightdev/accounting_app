@@ -50,8 +50,8 @@ if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = "En
 if ($pan !== '' && !preg_match('/^\d{9}$/', $pan)) {
     $errors[] = "PAN must be exactly 9 digits, numbers only.";
 }
-if ($phone !== '' && !preg_match('/^98\d{8}$/', $phone)) {
-    $errors[] = "Phone number must be 10 digits and start with 98.";
+if ($phone !== '' && !preg_match('/^9[78]\d{8}$/', $phone)) {
+    $errors[] = "Phone number must be 10 digits and start with 97 or 98.";
 }
 
 if ($errors) {
@@ -64,20 +64,39 @@ if ($errors) {
 }
 
 try {
-    // Duplicate check
-    $dupCheck = $pdo->prepare("
-        SELECT id
-        FROM contacts
-        WHERE email = ? AND is_active = TRUE
-    ");
-    $dupCheck->execute([$email]);
-    if ($dupCheck->fetch()) {
-        http_response_code(409);
-        echo json_encode([
-            "success" => false,
-            "message" => "A contact with this email already exists."
-        ]);
-        exit();
+    // Duplicate checks (email and PAN must each be unique among active contacts)
+    if ($email !== '') {
+        $dupCheck = $pdo->prepare("
+            SELECT id
+            FROM contacts
+            WHERE email = ? AND is_active = TRUE
+        ");
+        $dupCheck->execute([$email]);
+        if ($dupCheck->fetch()) {
+            http_response_code(409);
+            echo json_encode([
+                "success" => false,
+                "message" => "A contact with this email already exists."
+            ]);
+            exit();
+        }
+    }
+
+    if ($pan !== '') {
+        $panDupCheck = $pdo->prepare("
+            SELECT id
+            FROM contacts
+            WHERE pan = ? AND is_active = TRUE
+        ");
+        $panDupCheck->execute([$pan]);
+        if ($panDupCheck->fetch()) {
+            http_response_code(409);
+            echo json_encode([
+                "success" => false,
+                "message" => "A contact with this PAN already exists."
+            ]);
+            exit();
+        }
     }
 
     $stmt = $pdo->prepare("

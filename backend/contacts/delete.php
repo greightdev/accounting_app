@@ -75,6 +75,23 @@ try {
         exit();
     }
 
+    // Block delete if this vendor still has active purchase items pointing to it
+    $itemCheck = $pdo->prepare("
+        SELECT id
+        FROM items
+        WHERE vendor_id = ? AND is_active = TRUE
+        LIMIT 1
+    ");
+    $itemCheck->execute([$id]);
+    if ($itemCheck->fetch()) {
+        http_response_code(409);
+        echo json_encode([
+            "success" => false,
+            "message" => "This vendor has active purchase items linked to it. Delete or reassign those items first."
+        ]);
+        exit();
+    }
+
     // Soft delete
     $stmt = $pdo->prepare("
         UPDATE contacts

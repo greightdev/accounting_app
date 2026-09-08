@@ -51,8 +51,8 @@ if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = "En
 if ($pan !== '' && !preg_match('/^\d{9}$/', $pan)) {
     $errors[] = "PAN must be exactly 9 digits, numbers only.";
 }
-if ($phone !== '' && !preg_match('/^98\d{8}$/', $phone)) {
-    $errors[] = "Phone number must be 10 digits and start with 98.";
+if ($phone !== '' && !preg_match('/^9[78]\d{8}$/', $phone)) {
+    $errors[] = "Phone number must be 10 digits and start with 97 or 98.";
 }
 
 if ($errors) {
@@ -83,8 +83,8 @@ try {
         exit();
     }
 
-    // Duplicate check
-    if ($email !== $contacts['email']) {
+    // Duplicate checks (email and PAN)
+    if ($email !== '' && $email !== $contacts['email']) {
         $dupCheck = $pdo->prepare("
             SELECT id
             FROM contacts
@@ -96,6 +96,41 @@ try {
             echo json_encode([
                 "success" => false,
                 "message" => "A contact with this email already exists."
+            ]);
+            exit();
+        }
+    }
+
+    if ($pan !== '' && $pan !== $contacts['pan']) {
+        $panDupCheck = $pdo->prepare("
+            SELECT id
+            FROM contacts
+            WHERE pan = ? AND id != ? AND is_active = TRUE
+        ");
+        $panDupCheck->execute([$pan, $id]);
+        if ($panDupCheck->fetch()) {
+            http_response_code(409);
+            echo json_encode([
+                "success" => false,
+                "message" => "A contact with this PAN already exists."
+            ]);
+            exit();
+        }
+    }
+
+    if ($contacts['type'] === 'Vendor' && $type !== 'Vendor') {
+        $itemCheck = $pdo->prepare("
+            SELECT id
+            FROM items
+            WHERE vendor_id = ? AND is_active = TRUE
+            LIMIT 1
+        ");
+        $itemCheck->execute([$id]);
+        if ($itemCheck->fetch()) {
+            http_response_code(409);
+            echo json_encode([
+                "success" => false,
+                "message" => "This vendor has active purchase items linked to it and cannot change type. Delete or reassign those items first."
             ]);
             exit();
         }
