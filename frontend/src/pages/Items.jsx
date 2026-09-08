@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Search, SquarePen, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Search, SquarePen, Trash2, ChevronDown, Plus } from "lucide-react";
 import Toolbar from "../components/Toolbar";
 import Tabs from "../components/Tabs";
 import DataTable from "../components/DataTable";
@@ -7,7 +7,7 @@ import Modal from "../components/Modal";
 import api from "../api/axios";
 import Toast from "../components/Toast";
 import useToast from "../hooks/useToast";
-import { validateItemName, validateUnit, validateHsnSac, validatePrice, validateRequiredSelect, filterItemNameInput, filterUnitInput, filterDigitsOnly, filterDecimalInput } from "../utils/validators";
+import { validateItemName, validateUnit, validateHsnSac, validatePrice, validateRequiredSelect, validateGenericName, filterItemNameInput, filterUnitInput, filterDigitsOnly, filterDecimalInput } from "../utils/validators";
 import { useAuth } from "../context/AuthContext";
 import { can } from "../permissions";
 
@@ -15,7 +15,73 @@ const DEFAULT_TABS = [
     { key: "All", label: "All" },
     { key: "Selling", label: "Selling" },
     { key: "Purchase", label: "Purchase" },
+    { key: "Units", label: "Units" },
 ];
+
+// Custom dropdown for picking an item's unit
+function UnitPicker({ units, value, onChange, onAddNew, error }) {
+    const [open, setOpen] = useState(false);
+    const containerRef = useRef(null);
+
+    useEffect(() => {
+        function handleClickOutside(e) {
+            if (containerRef.current && !containerRef.current.contains(e.target)) {
+                setOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    const selectedUnit = units.find((u) => u.symbol === value);
+    const displayUnits = value && !selectedUnit
+        ? [{ id: "current-inactive", symbol: value, name: "no longer active" }, ...units]
+        : units;
+
+    return (
+        <div className="relative" ref={containerRef}>
+            <button
+                type="button"
+                onClick={() => setOpen((o) => !o)}
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg border ${error ? 'border-red-400' : 'border-gray-200'} bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition`}
+            >
+                <span className={value ? "" : "text-gray-400"}>
+                    {value ? (selectedUnit ? `${selectedUnit.symbol} - ${selectedUnit.name}` : `${value} (no longer active)`) : "Select unit"}
+                </span>
+                <ChevronDown size={16} className="text-gray-400 shrink-0" />
+            </button>
+
+            {open && (
+                <div className="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden">
+                    {/* Pinned row */}
+                    <button
+                        type="button"
+                        onClick={() => { setOpen(false); onAddNew(); }}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 border-b border-gray-100"
+                    >
+                        <Plus size={14} /> Add New Unit
+                    </button>
+                    <div className="max-h-48 overflow-y-auto">
+                        {displayUnits.length === 0 ? (
+                            <p className="px-4 py-3 text-sm text-gray-400">No units yet</p>
+                        ) : (
+                            displayUnits.map((u) => (
+                                <button
+                                    key={u.id}
+                                    type="button"
+                                    onClick={() => { onChange(u.symbol); setOpen(false); }}
+                                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 transition ${u.symbol === value ? 'bg-slate-50 font-medium text-slate-900' : 'text-gray-700'}`}
+                                >
+                                    {u.symbol} <span className="text-gray-400">- {u.name}</span>
+                                </button>
+                            ))
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
 
 const emptyForm = {
     name: '',
@@ -34,6 +100,7 @@ export default function Items() {
     const [items, setItems] = useState([]);
     const [vendors, setVendors] = useState([]);
     const [accounts, setAccounts] = useState([]);
+    const [units, setUnits] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [tab, setTab] = useState("All");
@@ -48,13 +115,121 @@ export default function Items() {
     const { toast, showToast, hideToast } = useToast();
 
     useEffect(() => {
+        if (tab === 'Units') return;
         fetchItems();
     }, [tab]);
 
     useEffect(() => {
         fetchVendors();
         fetchAccounts();
+        fetchUnits();
     }, []);
+
+    const fetchUnits = async () => {
+        try {
+            const { data } = await api.get('/units/list.php');
+            setUnits(data.data ?? []);
+        } catch (err) {
+            console.error('Failed to fetch units: ', err);
+        }
+    };
+
+    // Units tab
+    const [isUnitModalOpen, setIsUnitModalOpen] = useState(false);
+    const [editingUnit, setEditingUnit] = useState(null);
+    const [unitSymbol, setUnitSymbol] = useState('');
+    const [unitFullName, setUnitFullName] = useState('');
+    const [unitDescription, setUnitDescription] = useState('');
+    const [unitModalError, setUnitModalError] = useState('');
+    const [unitSubmitting, setUnitSubmitting] = useState(false);
+    const [unitModalReturnsToItemForm, setUnitModalReturnsToItemForm] = useState(false);
+
+    const openCreateUnitModal = (fromItemForm = false) => {
+        setEditingUnit(null);
+        setUnitSymbol('');
+        setUnitFullName('');
+        setUnitDescription('');
+        setUnitModalError('');
+        setUnitModalReturnsToItemForm(fromItemForm);
+        setIsUnitModalOpen(true);
+    };
+
+    const openEditUnitModal = (unit) => {
+        setEditingUnit(unit);
+        setUnitSymbol(unit.symbol);
+        setUnitFullName(unit.name);
+        setUnitDescription(unit.description ?? '');
+        setUnitModalError('');
+        setUnitModalReturnsToItemForm(false);
+        setIsUnitModalOpen(true);
+    };
+
+    const closeUnitModal = () => setIsUnitModalOpen(false);
+
+    const handleUnitSubmit = async (e) => {
+        e.preventDefault();
+        const symbolError = validateUnit(unitSymbol, { required: true });
+        const nameError = validateGenericName(unitFullName, { label: "Name" });
+        if (symbolError || nameError) {
+            setUnitModalError(symbolError || nameError);
+            return;
+        }
+
+        setUnitSubmitting(true);
+        try {
+            const payload = { symbol: unitSymbol, name: unitFullName, description: unitDescription };
+            if (editingUnit) {
+                await api.put('/units/update.php', { id: editingUnit.id, ...payload });
+                showToast("Unit updated successfully.");
+            } else {
+                await api.post('/units/create.php', payload);
+                showToast("Unit created successfully.");
+            }
+            closeUnitModal();
+            await fetchUnits();
+            if (unitModalReturnsToItemForm && !editingUnit) {
+                setForm((prev) => ({ ...prev, unit: unitSymbol }));
+            }
+        } catch (err) {
+            setUnitModalError(err.response?.data?.message ?? "Something went wrong.");
+        } finally {
+            setUnitSubmitting(false);
+        }
+    };
+
+    const handleUnitDelete = async (unit) => {
+        if (!window.confirm(`Delete unit "${unit.symbol}"? Items that already use this unit won't be affected.`)) return;
+        try {
+            await api.delete('/units/delete.php', { data: { id: unit.id } });
+            showToast("Unit deleted successfully.");
+            fetchUnits();
+        } catch (err) {
+            showToast(err.response?.data?.message ?? "Failed to delete unit.");
+        }
+    };
+
+    const filteredUnits = units
+        .filter((u) => u.symbol.toLowerCase().includes(search.toLowerCase()) || u.name.toLowerCase().includes(search.toLowerCase()))
+        .map((u, index) => ({ ...u, sn: index + 1 }));
+
+    const unitColumns = [
+        { key: "sn", header: "S.N." },
+        { key: "symbol", header: "Unit" },
+        { key: "name", header: "Name" },
+        { key: "description", header: "Description", render: (unit) => unit.description || <span className="text-gray-300">-</span> },
+        { key: "actions", header: "Action", align: "right", render: (unit) => (
+            <div className="flex items-center justify-end gap-2">
+                <button onClick={() => openEditUnitModal(unit)} className="p-2 rounded-md text-slate-600 hover:bg-slate-100">
+                    <SquarePen size={16} />
+                </button>
+                {canDelete && (
+                    <button onClick={() => handleUnitDelete(unit)} className="p-2 rounded-md text-slate-600 hover:bg-slate-100">
+                        <Trash2 size={16} />
+                    </button>
+                )}
+            </div>
+        ) },
+    ];
 
     const fetchAccounts = async () => {
         try {
@@ -70,6 +245,9 @@ export default function Items() {
     const accountOptionsForType = accounts.filter((a) =>
         modalType === 'selling' ? a.account_group_type === 'Income' : ['Expense', 'Asset'].includes(a.account_group_type)
     );
+
+    // Previously used HSN/SAC codes offered as autocomplete suggestions
+    const knownHsnSacCodes = [...new Set(items.map((i) => i.hsn_sac_code).filter(Boolean))].sort();
 
     const fetchItems = async () => {
         setLoading(true);
@@ -322,22 +500,34 @@ export default function Items() {
 
             <Toolbar
                 search={{ value: search, onChange: setSearch }}
-                // filters={{ options: ['All', 'Selling', 'Purchase'], active: filter, onChange: setFilter }}
-                actions={[
-                    { label: '+ Selling Item', onClick: () => openCreateModal('selling') },
-                    { label: '+ Purchase Item', onClick: () => openCreateModal('purchase') },
-                ]}
+                actions={
+                    tab === 'Units'
+                        ? [{ label: '+ Add Unit', onClick: openCreateUnitModal }]
+                        : [
+                            { label: '+ Selling Item', onClick: () => openCreateModal('selling') },
+                            { label: '+ Purchase Item', onClick: () => openCreateModal('purchase') },
+                        ]
+                }
             />
 
             <Tabs tabs={DEFAULT_TABS} active={tab} onChange={setTab} />
 
             <div className="bg-white rounded-lg shadow">
-                <DataTable
-                    columns={columns}
-                    data={filteredItems}
-                    loading={loading}
-                    emptyMessage="No items found"
-                />
+                {tab === 'Units' ? (
+                    <DataTable
+                        columns={unitColumns}
+                        data={filteredUnits}
+                        loading={false}
+                        emptyMessage="No units yet"
+                    />
+                ) : (
+                    <DataTable
+                        columns={columns}
+                        data={filteredItems}
+                        loading={loading}
+                        emptyMessage="No items found"
+                    />
+                )}
             </div>
 
             {/* Modal */}
@@ -403,12 +593,15 @@ export default function Items() {
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1.5">Unit</label>
-                            <input
-                                name="unit"
+                            <UnitPicker
+                                units={units}
                                 value={form.unit}
-                                onChange={handleChange}
-                                placeholder="hrs, kg..."
-                                className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.unit ? 'border-red-400' : 'border-gray-200'} bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition`}
+                                onChange={(symbol) => {
+                                    setForm((prev) => ({ ...prev, unit: symbol }));
+                                    if (fieldErrors.unit) setFieldErrors((prev) => ({ ...prev, unit: '' }));
+                                }}
+                                onAddNew={() => openCreateUnitModal(true)}
+                                error={fieldErrors.unit}
                             />
                             {fieldErrors.unit && <p className="mt-1 text-xs text-red-500">{fieldErrors.unit}</p>}
                         </div>
@@ -421,8 +614,14 @@ export default function Items() {
                                 onChange={handleChange}
                                 placeholder="1234"
                                 maxLength={20}
+                                list="hsn-sac-suggestions"
                                 className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.hsn_sac_code ? 'border-red-400' : 'border-gray-200'} bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition`}
                             />
+                            <datalist id="hsn-sac-suggestions">
+                                {knownHsnSacCodes.map((code) => (
+                                    <option key={code} value={code} />
+                                ))}
+                            </datalist>
                             {fieldErrors.hsn_sac_code && <p className="mt-1 text-xs text-red-500">{fieldErrors.hsn_sac_code}</p>}
                         </div>
                     </div>
@@ -469,6 +668,49 @@ export default function Items() {
                             <option value="VAT13">VAT 13%</option>
                             <option value="Exempt">Exempt</option>
                         </select>
+                    </div>
+                </Modal>
+            )}
+
+            {/* Unit Modal */}
+            {isUnitModalOpen && (
+                <Modal
+                    title={editingUnit ? 'Edit Unit' : 'Add Unit'}
+                    subtitle={editingUnit ? 'Update the unit details below' : 'Add the unit details below'}
+                    error={unitModalError}
+                    onClose={closeUnitModal}
+                    onSubmit={handleUnitSubmit}
+                    submitting={unitSubmitting}
+                    submitLabel={editingUnit ? 'Save Changes' : 'Add Unit'}
+                >
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Unit</label>
+                        <input
+                            value={unitSymbol}
+                            onChange={(e) => setUnitSymbol(filterUnitInput(e.target.value))}
+                            placeholder="kg"
+                            className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
+                            autoFocus
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Name</label>
+                        <input
+                            value={unitFullName}
+                            onChange={(e) => setUnitFullName(filterItemNameInput(e.target.value))}
+                            placeholder="Kilogram"
+                            className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Description <span className="text-gray-400 font-normal">(optional)</span></label>
+                        <textarea
+                            value={unitDescription}
+                            onChange={(e) => setUnitDescription(e.target.value)}
+                            placeholder="Unit of mass used commonly for groceries, raw materials, etc."
+                            rows={3}
+                            className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition resize-none"
+                        />
                     </div>
                 </Modal>
             )}
