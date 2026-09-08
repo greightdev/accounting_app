@@ -64,6 +64,18 @@ export default function DataTable({
                         </tr>
                     ) : (
                         pageRows.map((row, index) => {
+                            if (row.is_section_header) {
+                                return (
+                                    <tr key={row.id ?? `section-${index}`} className="bg-slate-200">
+                                        <td
+                                            colSpan={columns.length}
+                                            className="px-4 py-2.5 font-bold text-slate-800"
+                                        >
+                                            {row.label ?? row.section}
+                                        </td>
+                                    </tr>
+                                );
+                            }
                             const custom = rowClassName ? rowClassName(row) : "";
                             const zebra = custom.includes("bg-")
                                 ? ""

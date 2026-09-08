@@ -29,83 +29,69 @@ if (!$dateFrom || !$dateTo) {
 }
 
 try {
-    // Output VAT — from approved sales invoices
+    // 1. Sales side — Taxable Sales (1.1) and Exempt Sales (1.2)
     $outputStmt = $pdo->prepare("
         SELECT
-            COALESCE(SUM(t.sub_total), 0) AS total_taxable_sales,
-            COALESCE(SUM(t.vat_amount), 0) AS output_vat,
-            -- Vatable vs exempt breakdown
             COALESCE(SUM(
                 CASE WHEN ti.vat_rate > 0 THEN ti.taxable_amount ELSE 0 END
-            ), 0) AS vatable_sales,
+            ), 0) AS taxable_sales_amount,
+            COALESCE(SUM(t.vat_amount), 0) AS taxable_sales_vat,
             COALESCE(SUM(
                 CASE WHEN ti.vat_rate = 0 THEN ti.taxable_amount ELSE 0 END
-            ), 0) AS exempt_sales
+            ), 0) AS exempt_sales_amount
         FROM transactions t
         JOIN transaction_items ti ON ti.transaction_id = t.id
         WHERE t.type = 'SALES' AND t.status = 'APPROVED' AND t.date BETWEEN ? AND ?
     ");
     $outputStmt->execute([$dateFrom, $dateTo]);
-    $output = $outputStmt->fetch();
+    $sales = $outputStmt->fetch();
 
-    // Input VAT — from approved purchase bills
+    // 2. Purchase side — Taxable Purchase (2.1) and Exempt Purchase (2.2)
     $inputStmt = $pdo->prepare("
         SELECT
-            COALESCE(SUM(t.sub_total),  0) AS total_taxable_purchases,
-            COALESCE(SUM(t.vat_amount), 0) AS input_vat,
             COALESCE(SUM(
                 CASE WHEN ti.vat_rate > 0 THEN ti.taxable_amount ELSE 0 END
-            ), 0) AS vatable_purchases,
+            ), 0) AS taxable_purchase_amount,
+            COALESCE(SUM(t.vat_amount), 0) AS taxable_purchase_vat,
             COALESCE(SUM(
                 CASE WHEN ti.vat_rate = 0 THEN ti.taxable_amount ELSE 0 END
-            ), 0) AS exempt_purchases
+            ), 0) AS exempt_purchase_amount
         FROM transactions t
         JOIN transaction_items ti ON ti.transaction_id = t.id
         WHERE t.type = 'PURCHASE' AND t.status = 'APPROVED' AND t.date BETWEEN ? AND ?
     ");
     $inputStmt->execute([$dateFrom, $dateTo]);
-    $input = $inputStmt->fetch();
+    $purchases = $inputStmt->fetch();
 
-    $outputVat = (float)$output['output_vat'];
-    $inputVat = (float)$input['input_vat'];
-    $netVat = $outputVat - $inputVat; // positive = payable to IRD, negative = refundable
+    $taxableSalesAmount = (float)$sales['taxable_sales_amount'];
+    $taxableSalesVat = (float)$sales['taxable_sales_vat'];
+    $exemptSalesAmount = (float)$sales['exempt_sales_amount'];
 
-    // VAT ledger balance verification
-    $vatPayableStmt = $pdo->prepare("
-        SELECT
-            COALESCE(SUM(le.credit), 0) - COALESCE(SUM(le.debit), 0) AS vat_payable_balance
-        FROM ledger_entries le
-        JOIN accounts a ON a.id  = le.account_id
-        JOIN transactions t ON t.id  = le.transaction_id
-        WHERE a.name = 'VAT Payable' AND t.status = 'APPROVED' AND le.date BETWEEN ? AND ?
-    ");
-    $vatPayableStmt->execute([$dateFrom, $dateTo]);
-    $vatPayableBalance = (float)$vatPayableStmt->fetch()['vat_payable_balance'];
+    $taxablePurchaseAmount = (float)$purchases['taxable_purchase_amount'];
+    $taxablePurchaseVat = (float)$purchases['taxable_purchase_vat'];
+    $exemptPurchaseAmount = (float)$purchases['exempt_purchase_amount'];
 
-    $vatReceivableStmt = $pdo->prepare("
-        SELECT
-            COALESCE(SUM(le.debit), 0) - COALESCE(SUM(le.credit), 0) AS vat_receivable_balance
-        FROM ledger_entries le
-        JOIN accounts a ON a.id  = le.account_id
-        JOIN transactions t ON t.id  = le.transaction_id
-        WHERE a.name = 'VAT Receivable' AND t.status = 'APPROVED' AND le.date BETWEEN ? AND ?
-    ");
-    $vatReceivableStmt->execute([$dateFrom, $dateTo]);
-    $vatReceivableBalance = (float)$vatReceivableStmt->fetch()['vat_receivable_balance'];
+    // 3. जम्मा (Total)
+    $totalCredit = $taxablePurchaseVat;
+    $totalDebit = $taxableSalesVat;
 
-    $netFromLedger = $vatPayableBalance - $vatReceivableBalance;
-    $matchesCalculation = round($netVat, 2) === round($netFromLedger, 2);
+    // 4. डेविट-क्रेडिट (+/-) — net position for the period (positive = payable, negative = credit)
+    $netPosition = $totalDebit - $totalCredit;
 
     $rows = [
-        ['section' => 'Output (Sales)', 'label' => 'Vatable Sales', 'amount' => (float)$output['vatable_sales'], 'is_subtotal' => false],
-        ['section' => 'Output (Sales)', 'label' => 'Exempt Sales', 'amount' => (float)$output['exempt_sales'], 'is_subtotal' => false],
-        ['section' => 'Output (Sales)', 'label' => 'Output VAT', 'amount' => $outputVat, 'is_subtotal' => true],
+        ['is_section_header' => true, 'label' => '1. बिक्री'],
+        ['label' => '1.1 कर लाग्ने बिक्री', 'amount' => $taxableSalesAmount, 'credit' => null, 'debit' => $taxableSalesVat],
+        ['label' => '1.2 छुट बिक्री', 'amount' => $exemptSalesAmount, 'credit' => null, 'debit' => null],
 
-        ['section' => 'Input (Purchases)', 'label' => 'Vatable Purchases', 'amount' => (float)$input['vatable_purchases'], 'is_subtotal' => false],
-        ['section' => 'Input (Purchases)', 'label' => 'Exempt Purchases', 'amount' => (float)$input['exempt_purchases'], 'is_subtotal' => false],
-        ['section' => 'Input (Purchases)', 'label' => 'Input VAT', 'amount' => $inputVat, 'is_subtotal' => true],
+        ['is_section_header' => true, 'label' => '2. खरिद'],
+        ['label' => '2.1 कर लाग्ने खरिद', 'amount' => $taxablePurchaseAmount, 'credit' => $taxablePurchaseVat, 'debit' => null],
+        ['label' => '2.2 छुट खरिद', 'amount' => $exemptPurchaseAmount, 'credit' => null, 'debit' => null],
 
-        ['section' => 'Net Position', 'label' => $netVat >= 0 ? 'Net VAT Payable to IRD' : 'Net VAT Refundable', 'amount' => abs($netVat), 'is_subtotal' => true],
+        ['is_section_header' => true, 'label' => '3. जम्मा'],
+        ['label' => 'जम्मा', 'amount' => null, 'credit' => $totalCredit, 'debit' => $totalDebit, 'is_total' => true],
+
+        ['is_section_header' => true, 'label' => '4. नतिजा'],
+        ['label' => 'डेविट-क्रेडिट (+/-)', 'amount' => null, 'credit' => null, 'debit' => $netPosition, 'is_total' => true],
     ];
 
     http_response_code(200);
@@ -117,12 +103,10 @@ try {
             "date_from" => $dateFrom,
             "date_to" => $dateTo,
             "fiscal_year" => $fiscalYear,
-            "net_vat" => $netVat,
-            "is_payable" => $netVat > 0,
-            "is_refundable" => $netVat < 0,
-            "vat_payable_balance" => $vatPayableBalance,
-            "vat_receivable_balance" => $vatReceivableBalance,
-            "matches_calculation" => $matchesCalculation,
+            "total_credit" => $totalCredit,
+            "total_debit" => $totalDebit,
+            "net_position" => $netPosition,
+            "status" => $netPosition > 0 ? "PAYABLE" : ($netPosition < 0 ? "CREDIT_CARRIED_FORWARD" : "SETTLED"),
         ],
     ]);
 

@@ -67,15 +67,13 @@ export const NEPALI_TAX_REPORTS = {
         title: "VAT Return",
         endpoint: "/reports/tax_reports/vat_return.php",
         datesRequired: true,
-        summaryFields: [
-            { key: "net_vat", label: "Net VAT" },
-        ],
         columns: [
-            { key: "section", header: "Section" },
             { key: "label", header: "Item" },
-            { key: "amount", header: "Amount", align: "right", render: (r) => Number(r.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }) },
+            { key: "amount", header: "Amount", align: "right", render: (r) => r.amount === null ? "-" : Number(r.amount).toLocaleString(undefined, { minimumFractionDigits: 2 }) },
+            { key: "credit", header: "Credit", align: "right", render: (r) => r.credit === null ? "-" : Number(r.credit).toLocaleString(undefined, { minimumFractionDigits: 2 }) },
+            { key: "debit", header: "Debit", align: "right", render: (r) => r.debit === null ? "-" : Number(r.debit).toLocaleString(undefined, { minimumFractionDigits: 2 }) },
         ],
-        rowClassName: (row) => (row.is_subtotal ? "font-semibold bg-slate-100" : ""),
+        rowClassName: (row) => (row.is_total ? "font-semibold bg-slate-100" : ""),
     },
     "tds-summary-np": {
         title: "TDS Summary",
