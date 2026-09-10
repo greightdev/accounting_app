@@ -105,7 +105,11 @@ export const ACCOUNTING_REPORTS = {
         dateMode: "asOf",
         columns: [
             { key: "account_code", header: "Code" },
-            { key: "account_name", header: "Account" },
+            {
+                key: "account_name",
+                header: "Account",
+                render: (r) => r.is_contact_row ? `\u00A0\u00A0\u00A0\u00A0${r.account_name}` : r.account_name,
+            },
             { key: "section", header: "Section" },
             {
                 key: "amount",

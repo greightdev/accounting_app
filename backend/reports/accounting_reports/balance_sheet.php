@@ -44,6 +44,57 @@ try {
     $stmt->execute([$asOf]);
     $rows = $stmt->fetchAll();
 
+    // Accounts that should be expanded into a per-contact subledger instead of a single aggregate line.
+    $subledgerAccounts = [
+        'Vendor Payable' => 'Vendor',
+        'Customer Receivable' => 'Customer',
+    ];
+
+    $fetchSubledger = function (string $accountName, string $contactType, string $groupType, string $asOf) use ($pdo): array {
+        $stmt = $pdo->prepare("
+            SELECT
+                c.id AS contact_id,
+                c.name AS contact_name,
+                c.opening_balance,
+                c.opening_balance_type,
+                c.opening_date,
+                COALESCE(SUM(le.debit), 0) AS total_debit,
+                COALESCE(SUM(le.credit), 0) AS total_credit
+            FROM contacts c
+            LEFT JOIN transactions t
+                ON t.contact_id = c.id AND t.status = 'APPROVED'
+            LEFT JOIN ledger_entries le
+                ON le.transaction_id = t.id
+                AND le.date <= ?
+                AND le.account_id = (SELECT id FROM accounts WHERE name = ? LIMIT 1)
+            WHERE c.type = ? AND c.is_active = TRUE
+            GROUP BY c.id, c.name, c.opening_balance, c.opening_balance_type, c.opening_date
+        ");
+        $stmt->execute([$asOf, $accountName, $contactType]);
+
+        $out = [];
+        foreach ($stmt->fetchAll() as $r) {
+            $debit = (float)$r['total_debit'];
+            $credit = (float)$r['total_credit'];
+            $ledgerNet = ($groupType === 'Asset') ? ($debit - $credit) : ($credit - $debit);
+            $openingSigned = 0.0;
+            if ($r['opening_balance'] !== null && (float)$r['opening_balance'] !== 0.0 && $r['opening_date'] !== null && $r['opening_date'] <= $asOf) {
+                $ob = (float)$r['opening_balance'];
+                $isPositiveType = ($groupType === 'Asset')
+                    ? ($r['opening_balance_type'] === 'DEBIT')
+                    : ($r['opening_balance_type'] === 'CREDIT');
+                $openingSigned = $isPositiveType ? $ob : -$ob;
+            }
+
+            $balance = $openingSigned + $ledgerNet;
+            if (abs($balance) < 0.01) continue;
+
+            $out[] = ['contact_id' => (int)$r['contact_id'], 'name' => $r['contact_name'], 'balance' => $balance];
+        }
+        usort($out, fn($a, $b) => strcmp($a['name'], $b['name']));
+        return $out;
+    };
+
     $plStmt = $pdo->prepare("
         SELECT
             ag.type,
@@ -138,20 +189,46 @@ try {
             $bucketTrackers[$row['group_type']]['subtotal'] += $amount;
         }
 
+        $targetRows = null;
         switch ($row['group_type']) {
             case 'Asset':
                 $totalAssets += $amount;
-                $assetRows[] = $entry;
+                $targetRows = &$assetRows;
                 break;
             case 'Liability':
                 $totalLiabilities += $amount;
-                $liabilityRows[] = $entry;
+                $targetRows = &$liabilityRows;
                 break;
             case 'Equity':
                 $totalEquity += $amount;
-                $equityRows[] = $entry;
+                $targetRows = &$equityRows;
                 break;
         }
+
+        if ($targetRows !== null && isset($subledgerAccounts[$row['account_name']])) {
+            // Expand into a per-contact subledger instead of one aggregate line.
+            $contactType = $subledgerAccounts[$row['account_name']];
+            $breakdown = $fetchSubledger($row['account_name'], $contactType, $row['group_type'], $asOf);
+
+            foreach ($breakdown as $b) {
+                $targetRows[] = [
+                    'account_code' => '',
+                    'account_name' => $b['name'],
+                    'group_name' => $row['group_name'],
+                    'section' => $row['group_type'],
+                    'amount' => $b['balance'],
+                    'is_subtotal' => false,
+                    'is_contact_row' => true,
+                    'contact_id' => $b['contact_id'],
+                ];
+            }
+
+            $entry['account_name'] = 'Total ' . $row['account_name'];
+            $targetRows[] = $entry;
+        } else if ($targetRows !== null) {
+            $targetRows[] = $entry;
+        }
+        unset($targetRows);
     }
     $flushBucket('Asset');
     $flushBucket('Liability');
